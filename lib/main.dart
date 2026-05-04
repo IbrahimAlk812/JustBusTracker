@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:just_bus_tracker/screens/student/login_screen.dart'; 
+// تأكد من استيراد الشاشة الرئيسية للطالب فقط
+import 'package:just_bus_tracker/screens/student/student_home_screen.dart'; 
 
 void main() async {
-  // 1. ضمان تهيئة جميع خدمات فلاتر قبل تشغيل التطبيق
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. ربط التطبيق بمشروع Supabase (البيانات التي أرسلها إبراهيم الكردي)
   await Supabase.initialize(
     url: 'https://regtuxnoulgwfpyegohc.supabase.co',
     anonKey: 'sb_publishable_yl_OWdKFQIhmuLIOba2V9A_FtoPMYev',
@@ -27,7 +26,8 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      // نقطة الانطلاق هي الشاشة التي تحتوي على الـ BottomNavigationBar
+      home: const StudentHomeScreen(), 
     );
   }
 }
