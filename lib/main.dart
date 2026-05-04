@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_bus_tracker/screens/student/login_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // تأكد من استيراد الشاشة الرئيسية للطالب فقط
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
@@ -19,15 +20,14 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // داخل كود الـ main.dart
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Just Bus Tracker',
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      // نقطة الانطلاق هي الشاشة التي تحتوي على الـ BottomNavigationBar
-      home: const SupervisorDashboard(),
+      home: const LoginScreen(), // الانطلاقة تبدأ من هنا دائماً
     );
+  
   }
 }
         

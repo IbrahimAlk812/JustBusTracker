@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+// تأكد من صحة مسارات الاستيراد لشاشاتك
+import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
+import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -8,84 +12,115 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  String _selectedRole = 'طالب'; // الاختيار الافتراضي حسب الخطة
+  // للتحكم في الحقول
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  // الدالة المسؤولة عن تسجيل الدخول والتوجيه
+  Future<void> _loginAndRoute() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // 1. تسجيل الدخول عبر Supabase Auth
+      final AuthResponse res = await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      final User? user = res.user;
+
+      if (user != null) {
+        // 2. جلب نوع المستخدم (role) من جدول profiles
+        final profileData = await Supabase.instance.client
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id) // مطابقة الـ id مع حساب الـ Auth
+            .single();
+
+        final String userRole = profileData['role'];
+
+        if (!mounted) return; // للتأكد من أن الشاشة لا زالت فعالة
+
+        // 3. التوجيه (Routing) بناءً على الـ Role
+        if (userRole == 'student') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const StudentHomeScreen()),
+          );
+        } else if (userRole == 'supervisor') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const SupervisorDashboard()),
+          );
+        } else {
+          // يمكن إضافة شرط للسائق لاحقاً
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('لم يتم التعرف على صلاحيات الحساب.')),
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      // معالجة أخطاء الدخول (إيميل أو باسوورد خطأ)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تسجيل الدخول: ${e.message}')),
+      );
+    } catch (e) {
+      // أضف هذا السطر لطباعة الخطأ في شاشة الـ Debug Console في VS Code
+      print('🔥 الخطأ الحقيقي هو: $e'); 
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.')),
+      );
+    
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 30.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              // شعار المشروع (أيقونة مؤقتة)
-              const Icon(Icons.directions_bus_rounded, size: 90, color: Colors.blue),
-              const SizedBox(height: 15),
-              const Text(
-                "Just Bus Tracker",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.blue),
-              ),
-              const SizedBox(height: 40),
-
-              // حقل البريد الإلكتروني
-              TextField(
-                controller: _emailController,
-                decoration: InputDecoration(
-                  labelText: 'البريد الإلكتروني',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // حقل كلمة المرور
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'كلمة المرور',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // قائمة اختيار نوع المستخدم (موحدة)
-              DropdownButtonFormField<String>(
-                initialValue: _selectedRole,
-                decoration: InputDecoration(
-                  labelText: 'الدخول بصفة',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                items: ['طالب', 'سائق', 'مشرف'].map((role) {
-                  return DropdownMenuItem(value: role, child: Text(role));
-                }).toList(),
-                onChanged: (val) => setState(() => _selectedRole = val!),
-              ),
-              const SizedBox(height: 40),
-
-              // زر تسجيل الدخول
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // الربط البرمجي هو مهمة إبراهيم الكردي في اليوم الثاني
-                    debugPrint("محاولة دخول كـ: $_selectedRole");
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // حقل الإيميل
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: 'البريد الإلكتروني'),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 16),
+            // حقل الباسوورد
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'كلمة المرور'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 32),
+            // زر تسجيل الدخول
+            _isLoading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _loginAndRoute,
+                    child: const Text('تسجيل الدخول'),
                   ),
-                  child: const Text("تسجيل الدخول", style: TextStyle(fontSize: 18, color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
