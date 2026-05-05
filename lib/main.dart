@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// تأكد من استيراد الشاشة الرئيسية للطالب فقط
+// استيراد الشاشات من كلا الفرعين
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
-// تأكد من استيراد الشاشة الرئيسية للطالب فقط
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,13 +23,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Just Bus Tracker',
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      // نقطة الانطلاق هي الشاشة التي تحتوي على الـ BottomNavigationBar
-      home: const SupervisorDashboard(),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      // اختر الشاشة التي تريدها أن تظهر عند تشغيل التطبيق حالياً
+      home: const StudentHomeScreen(),
     );
   }
 }
-        
       // نقطة الانطلاق هي الشاشة التي تحتوي على الـ BottomNavigationBar
       
     
