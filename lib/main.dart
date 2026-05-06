@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:just_bus_tracker/screens/student/login_screen.dart';
+import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
+import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
+import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor_bus_table.dart';
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://regtuxnoulgwfpyegohc.supabase.co',
+    anonKey: 'sb_publishable_yl_OwdKFQHmulTOba2V9A_FtoPMYev',
+  );
+
   runApp(const MyApp());
 }
 
@@ -10,12 +23,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-     home: const SupervisorBusTable(),
+      debugShowCheckedModeBanner: false,
+      title: 'Just Bus Tracker',
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+      home: const SupervisorBusTable(),
     );
   }
 }
