@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:just_bus_tracker/screens/student/login_screen.dart';
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
-import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor_bus_table.dart';
 import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
 
