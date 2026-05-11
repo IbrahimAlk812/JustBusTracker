@@ -1,15 +1,16 @@
-
 import 'package:flutter/material.dart';
 
 class SupervisorBusTable extends StatelessWidget {
-  const SupervisorBusTable({Key? key}) : super(key: key);
+  const SupervisorBusTable({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لوحة تحكم المشرف - الباصات', 
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text(
+          'لوحة تحكم المشرف - الباصات',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
         backgroundColor: Colors.blue[900],
         centerTitle: true,
       ),
@@ -30,9 +31,11 @@ class SupervisorBusTable extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   child: Card(
                     elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     child: DataTable(
-                      headingRowColor: MaterialStateProperty.all(Colors.blue[100]),
+                      // تم تحديث هذا السطر لإزالة التحذير القديم
+                      headingRowColor: const WidgetStatePropertyAll(Color(0xFFBBDEFB)), 
                       columns: const [
                         DataColumn(label: Text('رقم الباص')),
                         DataColumn(label: Text('اسم السائق')),

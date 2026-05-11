@@ -1,58 +1,61 @@
 import 'package:flutter/material.dart';
+import 'supervisor_statistics_view.dart'; 
+import 'supervisor_bus_table.dart'; 
 
-class SupervisorDashboard extends StatelessWidget {
+class SupervisorDashboard extends StatefulWidget {
   const SupervisorDashboard({super.key});
+
+  @override
+  State<SupervisorDashboard> createState() => _SupervisorDashboardState();
+}
+
+class _SupervisorDashboardState extends State<SupervisorDashboard> {
+  int _currentIndex = 0;
+
+  // قائمة الشاشات: الترتيب مهم جداً لأنه يطابق ترتيب الأزرار في الأسفل
+  final List<Widget> _pages = [
+    const SupervisorStatisticsView(), // 0: شاشة البطاقات القديمة
+    const SupervisorBusTable(),       // 1: شاشة جدول زيد
+    const Scaffold(
+      body: Center(
+        child: Text(
+          "شاشة إدارة الشكاوى (قيد التنفيذ من قبل زيد)",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ),
+    ), // 2: شاشة الشكاوى المؤقتة
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('لوحة تحكم المشرف'),
-        backgroundColor: Colors.indigo, // لون مختلف لتمييز واجهة المشرف
-      ),
-      // القائمة الجانبية (مهمة اليوم 1 لزيد)
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.indigo),
-              child: Text('القائمة الرئيسية', style: TextStyle(color: Colors.white, fontSize: 20)),
-            ),
-            ListTile(leading: const Icon(Icons.dashboard), title: const Text('الإحصائيات'), onTap: () {}),
-            ListTile(leading: const Icon(Icons.bus_alert), title: const Text('إدارة الباصات'), onTap: () {}),
-            ListTile(leading: const Icon(Icons.report), title: const Text('الشكاوى'), onTap: () {}),
-          ],
-        ),
-      ),
-      // منطقة البطاقات الإحصائية (مهمة اليوم 2 لزيد)
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: GridView.count(
-          crossAxisCount: 2, // عرض بطاقتين في كل سطر
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: [
-            _buildStatusCard('الباصات النشطة', '12', Icons.directions_bus, Colors.blue),
-            _buildStatusCard('رحلات اليوم', '45', Icons.route, Colors.green),            _buildStatusCard('شكاوى معلقة', '3', Icons.warning, Colors.red),
-            _buildStatusCard('طلاب مسجلين', '120', Icons.people, Colors.orange),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // "Helper Function" لبناء البطاقات بسرعة (احترافية برمجية)
-  Widget _buildStatusCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      elevation: 4,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 40, color: color),
-          const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(value, style: TextStyle(fontSize: 20, color: color)),
+      // الـ body يعرض الشاشة المناسبة من القائمة أعلاه بناءً على الرقم
+      body: _pages[_currentIndex],
+      
+      // الشريط السفلي للتنقل
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index; // تحديث الرقم عند الضغط لتتغير الشاشة
+          });
+        },
+        // ألوان الشريط لتحسين المظهر
+        selectedItemColor: Colors.blue[900],
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'الإحصائيات',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.table_chart),
+            label: 'جدول المراقبة',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'الشكاوى',
+          ),
         ],
       ),
     );
