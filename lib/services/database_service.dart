@@ -42,4 +42,29 @@ class DatabaseService {
       return 0;
     }
   }
+  // ==========================================
+  // 3. دالة حجز مقعد (تتصل بـ RPC في Supabase)
+  // ==========================================
+  Future<String> bookSeat(String busNumber) async {
+    try {
+      // جلب ID الطالب المسجل دخوله حالياً
+      final currentUser = _supabase.auth.currentUser;
+      if (currentUser == null) return 'error_not_logged_in';
+
+      // استدعاء الدالة (RPC) اللي كتبناها بالـ SQL
+      final response = await _supabase.rpc(
+        'book_bus_seat',
+        params: {
+          'p_student_id': currentUser.id,
+          'p_bus_number': busNumber,
+        },
+      );
+
+      return response.toString(); // سترجع إما 'success' أو 'full'
+
+    } catch (e) {
+      print('❌ خطأ في عملية الحجز: $e');
+      return 'error';
+    }
+  }
 }
