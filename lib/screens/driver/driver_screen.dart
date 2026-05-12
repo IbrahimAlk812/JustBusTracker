@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// استدعاء ملف البطاقة اللي انت عملته
+import 'package:just_bus_tracker/screens/driver/bus_info_card.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({Key? key}) : super(key: key);
@@ -8,19 +10,17 @@ class DriverScreen extends StatefulWidget {
 }
 
 class _DriverScreenState extends State<DriverScreen> {
-  final String busNumber = "B-174"; 
-
+  
   void startTrip() {
-    print("Trip started for bus $busNumber");
+    print("Trip started");
   }
 
   void endTrip() {
-    print("Trip ended for bus $busNumber");
+    print("Trip ended");
   }
 
   void reportEmergency() {
-    print("Emergency reported for bus $busNumber");
-    // سيتم لاحقاً إضافة كود إرسال تنبيه الطوارئ إلى Supabase هنا
+    print("Emergency reported!");
   }
 
   @override
@@ -31,17 +31,13 @@ class _DriverScreenState extends State<DriverScreen> {
         centerTitle: true,
       ),
       body: Center(
-        child: SingleChildScrollView( // أضفناها لتجنب أي Overflow في الشاشات الصغيرة
+        child: SingleChildScrollView(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Bus Number: $busNumber',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              // استدعاء البطاقة من الملف الثاني
+              const BusInfoCard(),
+              
               const SizedBox(height: 50),
               
               // زر بدء الرحلة
@@ -50,14 +46,9 @@ class _DriverScreenState extends State<DriverScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   minimumSize: const Size(250, 80),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-                child: const Text(
-                  'Start Trip',
-                  style: TextStyle(fontSize: 24, color: Colors.white),
-                ),
+                child: const Text('Start Trip', style: TextStyle(fontSize: 24, color: Colors.white)),
               ),
               const SizedBox(height: 25),
               
@@ -67,38 +58,26 @@ class _DriverScreenState extends State<DriverScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   minimumSize: const Size(250, 80),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-                child: const Text(
-                  'End Trip',
-                  style: TextStyle(fontSize: 24, color: Colors.white),
-                ),
+                child: const Text('End Trip', style: TextStyle(fontSize: 24, color: Colors.white)),
               ),
-              
-              // مسافة فاصلة لتمييز زر الطوارئ
               const SizedBox(height: 60), 
               
-              // زر الطوارئ الجديد
+              // زر الطوارئ
               ElevatedButton(
                 onPressed: reportEmergency,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange, // لون تحذيري
+                  backgroundColor: Colors.orange,
                   minimumSize: const Size(250, 60),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.warning_amber_rounded, color: Colors.white),
                     SizedBox(width: 10),
-                    Text(
-                      'Report Emergency',
-                      style: TextStyle(fontSize: 20, color: Colors.white),
-                    ),
+                    Text('Report Emergency', style: TextStyle(fontSize: 20, color: Colors.white)),
                   ],
                 ),
               ),
