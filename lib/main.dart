@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:just_bus_tracker/screens/student/bus_list_screen.dart';
+import 'package:just_bus_tracker/screens/student/bus_list_view_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:just_bus_tracker/screens/student/login_screen.dart';
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
@@ -31,11 +31,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Just Bus Tracker',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-<<<<<<< Updated upstream
-      home: const SupervisorDashboard(),
-=======
-      home: BusListScreen(),
->>>>>>> Stashed changes
+
+      home: const BusListViewScreen(),
     );
   }
 }
