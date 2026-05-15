@@ -7,20 +7,25 @@ import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_bus_table.dart';
 import 'package:just_bus_tracker/screens/driver/bus_info_card.dart';
 import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // أضف هذا السطر فوق
+
 
 // ... other imports ...
 
-void main() async {
-  // This line is super important when initializing things before the app runs
-  WidgetsFlutterBinding.ensureInitialized();
 
-  // Connect to Ibrahim Alkordi's Supabase project
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // تحميل ملف البيئة أولاً
+  await dotenv.load(fileName: ".env");
+
+  // استخدام المفاتيح المشفرة
   await Supabase.initialize(
-    url: 'https://regtuxnoulgwfpyegohc.supabase.co',
-    anonKey: 'sb_publishable_yl_OWdKFQIhmuLIOba2V9A_FtoPMYev',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
-  runApp(const MyApp()); // Make sure this matches your app's main widget name
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -33,7 +38,9 @@ class MyApp extends StatelessWidget {
       title: 'Just Bus Tracker',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
 
-      home: const DriverScreen(),
+      //home: const StudentHomeScreen(),
+      //home: const DriverScreen()
+      home: const SupervisorDashboard()
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'supervisor_statistics_view.dart'; 
 import 'supervisor_bus_table.dart'; 
+import 'complaints_view.dart'; // استدعاء الملف الجديد الذي أنشأناه
 
 class SupervisorDashboard extends StatefulWidget {
   const SupervisorDashboard({super.key});
@@ -16,14 +17,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   final List<Widget> _pages = [
     const SupervisorStatisticsView(), // 0: شاشة البطاقات القديمة
     const SupervisorBusTable(),       // 1: شاشة جدول زيد
-    const Scaffold(
-      body: Center(
-        child: Text(
-          "شاشة إدارة الشكاوى (قيد التنفيذ من قبل زيد)",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ),
-    ), // 2: شاشة الشكاوى المؤقتة
+    const ComplaintsView()
   ];
 
   @override
