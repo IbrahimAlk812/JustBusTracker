@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// تأكد من صحة مسارات الاستيراد لشاشاتك
+// استدعاء الشاشات والواجهات الرئيسية للهيكل
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
+import 'package:just_bus_tracker/screens/driver/driver_home_screen.dart'; // ✅ تم إضافة استدعاء واجهة السائق الجديدة
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  // الدالة المسؤولة عن تسجيل الدخول والتوجيه
+  // Tالدالة المسؤولة عن تسجيل الدخول والتوجيه
   Future<void> _loginAndRoute() async {
     setState(() {
       _isLoading = true;
@@ -44,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (!mounted) return; // للتأكد من أن الشاشة لا زالت فعالة
 
-        // 3. التوجيه (Routing) بناءً على الـ Role
+        // 3. التوجيه (Routing) بناءً على الـ Role المحدث
         if (userRole == 'student') {
           Navigator.pushReplacement(
             context,
@@ -55,26 +56,27 @@ class _LoginScreenState extends State<LoginScreen> {
             context,
             MaterialPageRoute(builder: (context) => const SupervisorDashboard()),
           );
+        } else if (userRole == 'driver') {
+          // ✅ تم إضافة التوجيه الآمن للسائق إلى الهيكل المرتب الجديد
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DriverHomeScreen()),
+          );
         } else {
-          // يمكن إضافة شرط للسائق لاحقاً
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('لم يتم التعرف على صلاحيات الحساب.')),
           );
         }
       }
     } on AuthException catch (e) {
-      // معالجة أخطاء الدخول (إيميل أو باسوورد خطأ)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('خطأ في تسجيل الدخول: ${e.message}')),
       );
     } catch (e) {
-      // أضف هذا السطر لطباعة الخطأ في شاشة الـ Debug Console في VS Code
       print('🔥 الخطأ الحقيقي هو: $e'); 
-      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.')),
       );
-    
     } finally {
       if (mounted) {
         setState(() {

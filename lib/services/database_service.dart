@@ -45,25 +45,135 @@ class DatabaseService {
   // ==========================================
   // 3. دالة حجز مقعد (تتصل بـ RPC في Supabase)
   // ==========================================
-  Future<String> bookSeat(String busNumber) async {
+  // 🚀 دالة حجز المقعد (الطالب)
+  // 🚀 دالة حجز المقعد (الطالب)
+  Future<String> bookSeat(String busId) async {
     try {
-      // جلب ID الطالب المسجل دخوله حالياً
-      final currentUser = _supabase.auth.currentUser;
-      if (currentUser == null) return 'error_not_logged_in';
+      // 1. التحقق من تسجيل الدخول
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return 'error_not_logged_in';
 
-      // استدعاء الدالة (RPC) اللي كتبناها بالـ SQL
-      final response = await _supabase.rpc(
-        'book_bus_seat',
-        params: {
-          'p_student_id': currentUser.id,
-          'p_bus_number': busNumber,
-        },
-      );
+      // 2. 🛑 التحقق من عدم وجود حجز مسبق (منع الحجز المزدوج) بطريقة أكثر أماناً
+      final existingReservations = await Supabase.instance.client
+          .from('reservations')
+          .select()
+          .eq('user_id', userId)
+          .limit(1); // اطلب نتيجة واحدة فقط بدلاً من maybeSingle
 
-      return response.toString(); // سترجع إما 'success' أو 'full'
+      if (existingReservations.isNotEmpty) {
+        return 'already_booked'; // إذا كانت القائمة غير فارغة، يعني أنه حجز مسبقاً
+      }
 
+      // 🌟 دالة لمعرفة الباص الذي حجزه الطالب مسبقاً (إن وجد)
+  Future<String?> getUserBookedBusId() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return null;
+
+      final existingReservations = await Supabase.instance.client
+          .from('reservations')
+          .select('bus_id')
+          .eq('user_id', userId)
+          .limit(1);
+
+      if (existingReservations.isNotEmpty) {
+        return existingReservations.first['bus_id'].toString();
+      }
+      return null; // إذا لم يقم بالحجز مسبقاً
     } catch (e) {
-      print('❌ خطأ في عملية الحجز: $e');
+      print('🔥 خطأ في جلب حجز الطالب: $e');
+      return null;
+    }
+  }
+
+      // 3. جلب بيانات الباص للتحقق من السعة الحالية
+      final busData = await Supabase.instance.client
+          .from('buses')
+          .select('capacity, current_passengers')
+          .eq('id', busId)
+          .single();
+
+      final int capacity = busData['capacity'] ?? 0;
+      final int currentPassengers = busData['current_passengers'] ?? 0;
+
+      // 4. منع الحجز إذا كان الباص ممتلئاً
+      if (currentPassengers >= capacity) {
+        return 'full';
+      }
+
+      // 5. إضافة الحجز في جدول الحجوزات
+      await Supabase.instance.client.from('reservations').insert({
+        'user_id': userId,
+        'bus_id': busId,
+      });
+
+      // 6. تحديث عدد الركاب الحاليين في جدول الباصات
+      await Supabase.instance.client
+          .from('buses')
+          .update({'current_passengers': currentPassengers + 1})
+          .eq('id', busId);
+
+      return 'success';
+    } catch (e) {
+      print('🔥 خطأ أثناء عملية الحجز: $e');
+      return 'error';
+    }
+  }
+  // 🌟 دالة لمعرفة الباص الذي حجزه الطالب مسبقاً (إن وجد)
+  Future<String?> getUserBookedBusId() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return null;
+
+      // الاستعلام من جدول الحجوزات عن حجز هذا الطالب
+      final existingReservations = await Supabase.instance.client
+          .from('reservations')
+          .select('bus_id')
+          .eq('user_id', userId)
+          .limit(1);
+
+      if (existingReservations.isNotEmpty) {
+        return existingReservations.first['bus_id'].toString();
+      }
+      return null; // إذا لم يقم بالحجز مسبقاً
+    } catch (e) {
+      print('🔥 خطأ في جلب حجز الطالب: $e');
+      return null;
+    }
+  }
+
+  // 🗑️ دالة إلغاء الحجز
+  Future<String> cancelReservation(String busId) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return 'error_not_logged_in';
+
+      // 1. حذف الحجز من جدول الحجوزات
+      await Supabase.instance.client
+          .from('reservations')
+          .delete()
+          .eq('user_id', userId)
+          .eq('bus_id', busId);
+
+      // 2. جلب بيانات الباص لإنقاص العداد
+      final busData = await Supabase.instance.client
+          .from('buses')
+          .select('current_passengers')
+          .eq('id', busId)
+          .single();
+
+      final int currentPassengers = busData['current_passengers'] ?? 0;
+
+      // 3. إنقاص العداد (مع التأكد أنه لا ينزل تحت الصفر)
+      final newCount = currentPassengers > 0 ? currentPassengers - 1 : 0;
+      await Supabase.instance.client
+          .from('buses')
+          .update({'current_passengers': newCount})
+          .eq('id', busId);
+
+      return 'success';
+    } catch (e) {
+      print('🔥 خطأ أثناء إلغاء الحجز: $e');
       return 'error';
     }
   }

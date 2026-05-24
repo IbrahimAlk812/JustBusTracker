@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:just_bus_tracker/screens/driver/bus_info_card.dart';
-// 1️⃣ استدعاء ملف الخريطة الجديد اللي عملناه
-import 'package:just_bus_tracker/screens/driver/driver_map_preview.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DriverScreen extends StatefulWidget {
+  // المعرّف الخاص بباص السائق (يمكن تمريره عند تسجيل الدخول)
+  // وضعنا UUID الباص B-101 كمثال للتجربة الفورية
+  final String busId = '317bdd6f-0e79-4578-8cd2-0acdc2214176'; 
+
   const DriverScreen({Key? key}) : super(key: key);
 
   @override
@@ -11,85 +15,161 @@ class DriverScreen extends StatefulWidget {
 }
 
 class _DriverScreenState extends State<DriverScreen> {
-  
-  void startTrip() {
-    print("Trip started");
+  bool _isTracking = false;
+  StreamSubscription<Position>? _positionStreamSubscription;
+
+  // 🛡️ دالة فحص الصلاحيات وطلبها
+  Future<bool> _handleLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showSnackBar('الرجاء تفعيل خدمة الموقع (GPS)', isError: true);
+      return false;
+    }
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showSnackBar('تم رفض صلاحيات الموقع', isError: true);
+        return false;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackBar('صلاحيات الموقع مرفوضة نهائياً من إعدادات الهاتف', isError: true);
+      return false;
+    }
+    return true;
   }
 
-  void endTrip() {
-    print("Trip ended");
+  // 📡 دالة بدء بث الموقع (بدء الرحلة)
+  Future<void> _startTracking() async {
+    final hasPermission = await _handleLocationPermission();
+    if (!hasPermission) return;
+
+    setState(() {
+      _isTracking = true;
+    });
+
+    // إعدادات الـ GPS: تحديث الموقع كلما تحرك السائق 10 أمتار
+    final LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, 
+    );
+
+    _positionStreamSubscription = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((Position? position) async {
+      if (position != null) {
+        // إرسال الإحداثيات الجديدة إلى Supabase في الخلفية
+        try {
+          await Supabase.instance.client
+              .from('bus_locations')
+              .update({
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+              })
+              .eq('bus_id', widget.busId); // تحديث سطر الباص الخاص بهذا السائق
+              
+          debugPrint('تم تحديث الموقع: ${position.latitude}, ${position.longitude}');
+        } catch (e) {
+          debugPrint('خطأ في إرسال الموقع: $e');
+        }
+      }
+    });
   }
 
-  void reportEmergency() {
-    print("Emergency reported!");
+  // 🛑 دالة إيقاف البث (إنهاء الرحلة)
+  void _stopTracking() {
+    _positionStreamSubscription?.cancel();
+    setState(() {
+      _isTracking = false;
+    });
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('Driver Dashboard'),
+        title: const Text('لوحة قيادة السائق', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+            ),
+          ),
+        ),
       ),
       body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // الكرت اللي بيعرض معلومات الباص والركاب
-              const BusInfoCard(),
-              
-              const SizedBox(height: 20), // مسافة فاصلة
-              
-              // 2️⃣ الخريطة حطيناها هون! (تحت الكرت ومباشرة فوق الأزرار) 👇
-              const DriverMapPreview(),
-              
-              const SizedBox(height: 30), // مسافة فاصلة قبل الأزرار
-              
-              // زر بدء الرحلة
-              ElevatedButton(
-                onPressed: startTrip,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  minimumSize: const Size(250, 60), // صغرنا الزر شوي عشان يوسع مع الخريطة
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-                child: const Text('Start Trip', style: TextStyle(fontSize: 22, color: Colors.white)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // أيقونة توضح حالة الاتصال
+            Icon(
+              _isTracking ? Icons.radar : Icons.location_off,
+              size: 100,
+              color: _isTracking ? Colors.green : Colors.grey,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _isTracking ? 'يتم الآن بث الموقع للطلاب...' : 'نظام التتبع متوقف',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: _isTracking ? Colors.green : Colors.grey[700],
               ),
-              const SizedBox(height: 15),
-              
-              // زر إنهاء الرحلة
-              ElevatedButton(
-                onPressed: endTrip,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  minimumSize: const Size(250, 60),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-                child: const Text('End Trip', style: TextStyle(fontSize: 22, color: Colors.white)),
-              ),
-              const SizedBox(height: 25), 
-              
-              // زر الطوارئ
-              ElevatedButton(
-                onPressed: reportEmergency,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  minimumSize: const Size(250, 50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.white),
-                    SizedBox(width: 10),
-                    Text('Report Emergency', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 50),
+            
+            // زر البداية والنهاية الكبير
+            GestureDetector(
+              onTap: _isTracking ? _stopTracking : _startTracking,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isTracking ? Colors.red : const Color(0xFF1A237E),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isTracking ? Colors.red : const Color(0xFF1A237E)).withOpacity(0.4),
+                      spreadRadius: 10,
+                      blurRadius: 20,
+                    ),
                   ],
                 ),
+                child: Center(
+                  child: Text(
+                    _isTracking ? 'إنهاء الرحلة' : 'بدء الرحلة',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 20), // مسافة عشان ما يلزق بآخر الشاشة
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
