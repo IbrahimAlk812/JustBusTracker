@@ -10,7 +10,7 @@ class BusInfoCard extends StatefulWidget {
 
 class _BusInfoCardState extends State<BusInfoCard> {
   // معرف الباص الافتراضي (يمكنك استبداله لاحقاً بناءً على معرف السائق بعد الـ Login)
-  final String targetBusId = '1'; 
+  final String targetBusId = 'ed273233-26b1-4951-b850-15c4c5d80cff'; 
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +48,11 @@ class _BusInfoCardState extends State<BusInfoCard> {
         // 4️⃣ استخراج البيانات الحية المستلمة من Supabase
         final busData = snapshot.data!.first;
         final String busNumber = busData['bus_number'] ?? 'N/A';
-        final String routeName = busData['route_name'] ?? 'لم يحدد مسار';
+        final String routeName = busData['route'] ?? 'لم يحدد مسار';
         
         // جلب عدد الحجوزات الحالي والسعة القصوى من الأعمدة في الداتا بيز
         final int currentPassengers = busData['current_passengers'] ?? 0;
-        final int maxCapacity = busData['max_capacity'] ?? 50;
+        final int maxCapacity = busData['capacity'] ?? 50;
 
         // 5️⃣ تصميم الواجهة وعرض البيانات والعداد اللحظي
         return Card(
