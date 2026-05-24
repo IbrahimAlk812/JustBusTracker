@@ -8,7 +8,6 @@ import 'package:just_bus_tracker/screens/supervisor/supervisor_bus_table.dart';
 import 'package:just_bus_tracker/screens/driver/bus_info_card.dart';
 import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // أضف هذا السطر فوق
-import 'package:just_bus_tracker/screens/driver/driver_screen.dart';
 
 // ... other imports ...
 
@@ -38,10 +37,10 @@ class MyApp extends StatelessWidget {
       title: 'Just Bus Tracker',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
 
-      //home: const StudentHomeScreen(),
+      home: const StudentHomeScreen(),
       //home: const SupervisorDashboard()
       //home: const DriverScreen()
-      home: const DriverScreen(),
+      //home: const DriverScreen(),
     );
   }
 }

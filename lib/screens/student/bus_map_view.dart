@@ -1,162 +1,159 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class BusTrackingScreen extends StatefulWidget {
-  const BusTrackingScreen({super.key});
+class StudentMapView extends StatefulWidget {
+  const StudentMapView({Key? key}) : super(key: key);
 
   @override
-  State<BusTrackingScreen> createState() => _BusTrackingScreenState();
+  State<StudentMapView> createState() => _StudentMapViewState();
 }
 
-class _BusTrackingScreenState extends State<BusTrackingScreen> {
-  GoogleMapController? _mapController;
-  Position? _currentPosition;
-  bool _isLoading = true;
-  String _errorMessage = '';
+class _StudentMapViewState extends State<StudentMapView> {
+  GoogleMapController? mapController;
+  bool _hasLocationPermission = false;
+  
+  // مجموعة العلامات (Markers) التي ستظهر على الخريطة
+  Set<Marker> _busMarkers = {};
+  
+  // للتحكم في الاتصال الحي بقاعدة البيانات (لإغلاقه عند الخروج من الشاشة)
+  StreamSubscription? _busLocationsSubscription;
 
-  // موقع افتراضي (مثلاً: عمان، الأردن) في حال لم تتوفر الصلاحيات فوراً
-  static const LatLng _defaultLocation = LatLng(31.9522, 35.9150);
+  // إحداثيات افتراضية (جامعة التكنو)
+  static const CameraPosition _initialPosition = CameraPosition(
+    target: LatLng(32.4939, 35.9890), 
+    zoom: 14.0,
+  );
 
   @override
   void initState() {
     super.initState();
-    _checkLocationPermissionAndGetLocation();
+    _checkAndRequestLocationPermission();
+    _startListeningToBusLocations(); // تشغيل الرادار لجلب الباصات 📡
   }
 
-  // صلاحيات الموقع + جلب موقع الطالب الحالي
-  Future<void> _checkLocationPermissionAndGetLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  @override
+  void dispose() {
+    // إغلاق الاتصال عند الخروج من الشاشة لتوفير الموارد
+    _busLocationsSubscription?.cancel();
+    super.dispose();
+  }
 
-    try {
-      // 1. التحقق من تفعيل خدمة الـ GPS في الهاتف
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() {
-          _errorMessage = 'الرجاء تفعيل خدمة الموقع (GPS) في الهاتف.';
-          _isLoading = false;
-        });
-        return;
-      }
+  // 1️⃣ دالة رصد مواقع الباصات الحية من Supabase
+  void _startListeningToBusLocations() {
+    _busLocationsSubscription = Supabase.instance.client
+        .from('bus_locations') // تأكد أن هذا هو اسم جدول المواقع عندك
+        .stream(primaryKey: ['id'])
+        .listen((List<Map<String, dynamic>> data) {
+      
+      Set<Marker> newMarkers = {};
+      
+      for (var locationData in data) {
+        // ⚠️ مهم: تأكد من أسماء الأعمدة في جدول bus_locations (مثلاً lat و lng)
+        final double? lat = double.tryParse(locationData['latitude']?.toString() ?? '');
+        final double? lng = double.tryParse(locationData['longitude']?.toString() ?? '');
+        final String busId = locationData['bus_id']?.toString() ?? 'مجهول';
 
-      // 2. التحقق من صلاحيات التطبيق
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        // طلب الإذن من الطالب
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          setState(() {
-            _errorMessage = 'تم رفض إذن الوصول للموقع.';
-            _isLoading = false;
-          });
-          return;
+        if (lat != null && lng != null) {
+          newMarkers.add(
+            Marker(
+              markerId: MarkerId('bus_$busId'),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(
+                title: 'باص رقم $busId',
+                snippet: 'متاح للحجز',
+              ),
+              // أيقونة زرقاء لتمييز الباص عن موقع الطالب
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure), 
+            ),
+          );
         }
       }
 
-      if (permission == LocationPermission.deniedForever) {
+      // تحديث الخريطة بالعلامات الجديدة
+      if (mounted) {
         setState(() {
-          _errorMessage =
-              'تم رفض الصلاحيات بشكل دائم. يرجى تفعيلها من إعدادات الهاتف.';
-          _isLoading = false;
+          _busMarkers = newMarkers;
         });
-        return;
       }
-
-      // 3. جلب الموقع الحالي بنجاح
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      setState(() {
-        _currentPosition = position;
-        _isLoading = false;
-      });
-
-      // تحريك الكاميرا إلى موقع الطالب فور جلب الموقع
-      _moveCameraToPosition(LatLng(position.latitude, position.longitude));
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'حدث خطأ أثناء جلب الموقع: $e';
-        _isLoading = false;
-      });
-    }
+    });
   }
 
-  // دالة لتحريك الكاميرا بسلاسة
-  void _moveCameraToPosition(LatLng target) {
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: target, zoom: 15.0),
-      ),
-    );
+  // 2️⃣ دالة تحديد موقع الطالب (النقطة الزرقاء)
+  Future<void> _checkAndRequestLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    setState(() {
+      _hasLocationPermission = true;
+    });
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high
+      );
+      
+      mapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(position.latitude, position.longitude),
+        ),
+      );
+    } catch (e) {
+      debugPrint("Error getting location: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('تتبع الباص'),
+        title: const Text('تتبع مسار الباص', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        backgroundColor: Colors.blueAccent,
+        elevation: 0,
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            ) // شاشة تحميل أثناء جلب الموقع
-          : _errorMessage.isNotEmpty
-          ? Center(
-              child: Text(
-                _errorMessage,
-                style: const TextStyle(color: Colors.red, fontSize: 16),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: _initialPosition,
+            myLocationEnabled: _hasLocationPermission, 
+            myLocationButtonEnabled: _hasLocationPermission,
+            zoomControlsEnabled: false,
+            markers: _busMarkers, // عرض الباصات هنا 🚌
+            onMapCreated: (GoogleMapController controller) {
+              mapController = controller;
+            },
+          ),
+          
+          if (!_hasLocationPermission)
+            Container(
+              color: Colors.white.withOpacity(0.8),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('جاري تحديد موقعك...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-            )
-          : Stack(
-              children: [
-                // واجهة خريطة جوجل واستبدال النص الثابت
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: _currentPosition != null
-                        ? LatLng(
-                            _currentPosition!.latitude,
-                            _currentPosition!.longitude,
-                          )
-                        : _defaultLocation,
-                    zoom: 15.0,
-                  ),
-                  onMapCreated: (GoogleMapController controller) {
-                    _mapController = controller;
-                  },
-                  // إظهار النقطة الزرقاء التي تمثل موقع الطالب الحالي
-                  myLocationEnabled: true,
-                  // إخفاء زر النقل التلقائي الافتراضي لخرائط جوجل لكي نتحكم به بأنفسنا
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: true,
-                ),
-
-                // زر عائم اختياري لإعادة تركيز الخريطة على موقع الطالب
-                Positioned(
-                  bottom: 20,
-                  right: 20,
-                  child: FloatingActionButton(
-                    backgroundColor: Colors.blueAccent,
-                    child: const Icon(Icons.my_location, color: Colors.white),
-                    onPressed: () {
-                      if (_currentPosition != null) {
-                        _moveCameraToPosition(
-                          LatLng(
-                            _currentPosition!.latitude,
-                            _currentPosition!.longitude,
-                          ),
-                        );
-                      } else {
-                        _checkLocationPermissionAndGetLocation();
-                      }
-                    },
-                  ),
-                ),
-              ],
             ),
+        ],
+      ),
     );
   }
 }

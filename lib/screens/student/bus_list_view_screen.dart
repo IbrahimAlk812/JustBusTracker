@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:just_bus_tracker/services/database_service.dart'; // Import your service
+import 'package:just_bus_tracker/services/database_service.dart'; 
 
 class BusListViewScreen extends StatefulWidget {
   const BusListViewScreen({super.key});
@@ -11,7 +11,6 @@ class BusListViewScreen extends StatefulWidget {
 class _BusListViewScreenState extends State<BusListViewScreen> {
   final DatabaseService _dbService = DatabaseService();
 
-  // Helper to show modern status messages
   void _showNotification(String message, bool success) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -23,15 +22,14 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     );
   }
 
-  // Handle Booking logic
   Future<void> _processBooking(String busId) async {
     final status = await _dbService.bookSeat(busId);
 
     if (status == 'success') {
-      _showNotification('Seat booked successfully!', true);
-      setState(() {}); // Refresh UI to update capacity
+      _showNotification('تم حجز المقعد بنجاح!', true);
+      setState(() {}); 
     } else {
-      _showNotification('Booking failed: Bus is full.', false);
+      _showNotification('فشل الحجز: الباص ممتلئ.', false);
     }
   }
 
@@ -41,7 +39,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: const Text(
-          'Available Buses',
+          'الباصات المتاحة',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -53,15 +51,18 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
           ),
         ),
       ),
-      // 1. Fetching all buses from Database
+      // جلب البيانات مرة واحدة فقط من الجدول
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _dbService.getBuses(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return const Center(child: Text('حدث خطأ أثناء جلب البيانات.'));
+          }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No buses available right now.'));
+            return const Center(child: Text('لا يوجد باصات متاحة حالياً.'));
           }
 
           final buses = snapshot.data!;
@@ -71,24 +72,26 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
             itemCount: buses.length,
             itemBuilder: (context, index) {
               final bus = buses[index];
-              final busId = bus['id'].toString();
-              final destination = bus['to'] ?? 'Unknown';
+              
+              // 1️⃣ استخدام أسماء الأعمدة المتطابقة تماماً مع صورتك في Supabase
+              final String busId = bus['id'].toString(); 
+              final String busNumber = bus['bus_number']?.toString() ?? 'N/A';
+              final String routeName = bus['route']?.toString() ?? 'مسار غير محدد';
+              
+              // 2️⃣ حساب السعة المتاحة فوراً بدون دوال خارجية تسبب أخطاء
+              final int maxCapacity = int.tryParse(bus['capacity']?.toString() ?? '0') ?? 0;
+              final int currentPassengers = int.tryParse(bus['current_passengers']?.toString() ?? '0') ?? 0;
+              
+              final int availableSeats = maxCapacity - currentPassengers;
+              final bool isFull = availableSeats <= 0;
 
-              // 2. Fetching real-time capacity for each bus
-              return FutureBuilder<int>(
-                future: _dbService.getAvailableCapacity(busId, destination),
-                builder: (context, capSnapshot) {
-                  final capacity = capSnapshot.data ?? 0;
-                  final bool isFull = capacity <= 0;
-
-                  return _buildBusCard(
-                    busId,
-                    destination,
-                    bus['price'],
-                    capacity,
-                    isFull,
-                  );
-                },
+              // عرض البطاقة مباشرة
+              return _buildBusCard(
+                busId,       
+                busNumber,   
+                routeName,   
+                availableSeats,
+                isFull,
               );
             },
           );
@@ -99,11 +102,11 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
 
   Widget _buildBusCard(
     String id,
-    String to,
-    dynamic price,
-    int capacity,
+    String busNumber,
+    String routeName,
+    int availableSeats,
     bool isFull,
-  ) {
+  ) { 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
@@ -130,28 +133,21 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bus #$id',
+                        'باص رقم $busNumber', 
                         style: const TextStyle(
                           color: Colors.grey,
-                          fontSize: 12,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        to,
+                        routeName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 17,
                         ),
                       ),
                     ],
-                  ),
-                ),
-                Text(
-                  '$price JOD',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                    fontSize: 16,
                   ),
                 ),
               ],
@@ -169,7 +165,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      isFull ? 'Full' : '$capacity seats left',
+                      isFull ? 'ممتلئ' : '$availableSeats مقاعد متاحة',
                       style: TextStyle(
                         color: isFull ? Colors.red : Colors.blueGrey,
                         fontWeight: FontWeight.bold,
@@ -186,7 +182,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                     ),
                   ),
                   child: const Text(
-                    'Book Now',
+                    'احجز الآن',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
