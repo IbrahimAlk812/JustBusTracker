@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:just_bus_tracker/screens/auth/signup_screen.dart';
 // استدعاء الشاشات والواجهات الرئيسية للهيكل
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
-import 'package:just_bus_tracker/screens/driver/driver_home_screen.dart'; // ✅ تم إضافة استدعاء واجهة السائق الجديدة
+import 'package:just_bus_tracker/screens/driver/driver_home_screen.dart';
+// 🌟 استدعاء شاشة إنشاء الحساب (تأكد من مسار الملف إذا كان في مجلد مختلف)
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  // Tالدالة المسؤولة عن تسجيل الدخول والتوجيه
+  // الدالة المسؤولة عن تسجيل الدخول والتوجيه
   Future<void> _loginAndRoute() async {
     setState(() {
       _isLoading = true;
@@ -26,24 +28,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 1. تسجيل الدخول عبر Supabase Auth
-      final AuthResponse res = await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      final AuthResponse res = await Supabase.instance.client.auth
+          .signInWithPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
       final User? user = res.user;
 
       if (user != null) {
-        // 2. جلب نوع المستخدم (role) من جدول profiles
+        // 2. جلب نوع المستخدم (role) وحالة التفعيل من جدول profiles
         final profileData = await Supabase.instance.client
             .from('profiles')
-            .select('role')
-            .eq('id', user.id) // مطابقة الـ id مع حساب الـ Auth
+            .select('role, is_approved') // 🌟 جلبنا حالة التفعيل مع الدور
+            .eq('id', user.id)
             .single();
 
         final String userRole = profileData['role'];
+        final bool isApproved =
+            profileData['is_approved'] ?? false; // 🌟 فحص التفعيل
 
-        if (!mounted) return; // للتأكد من أن الشاشة لا زالت فعالة
+        if (!mounted) return;
+
+        // 🌟 الجدار الأمني: إذا كان الحساب غير مفعل، نمنع الدخول
+        if (!isApproved) {
+          await Supabase.instance.client.auth.signOut(); // تسجيل خروج فوري
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('عذراً، حسابك قيد المراجعة بانتظار موافقة المشرف.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          return; // إيقاف تنفيذ الكود وعدم التوجيه
+        }
+
+        // ... باقي كود التوجيهات كما هو في ملفكأكد من أن الشاشة لا زالت فعالة
 
         // 3. التوجيه (Routing) بناءً على الـ Role المحدث
         if (userRole == 'student') {
@@ -54,10 +74,11 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (userRole == 'supervisor') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const SupervisorDashboard()),
+            MaterialPageRoute(
+              builder: (context) => const SupervisorDashboard(),
+            ),
           );
         } else if (userRole == 'driver') {
-          // ✅ تم إضافة التوجيه الآمن للسائق إلى الهيكل المرتب الجديد
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const DriverHomeScreen()),
@@ -73,9 +94,11 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(content: Text('خطأ في تسجيل الدخول: ${e.message}')),
       );
     } catch (e) {
-      print('🔥 الخطأ الحقيقي هو: $e'); 
+      print('🔥 الخطأ الحقيقي هو: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.')),
+        const SnackBar(
+          content: Text('حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -122,6 +145,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _loginAndRoute,
                     child: const Text('تسجيل الدخول'),
                   ),
+
+            // 🌟 تم وضع كود إنشاء الحساب هنا مباشرة تحت زر تسجيل الدخول
+            const SizedBox(height: 20),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SignupScreen()),
+                );
+              },
+              child: const Text(
+                'ليس لديك حساب؟ أنشئ حساباً جديداً',
+                style: TextStyle(
+                  color: Color(0xFF1A237E),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+
+            // 🌟 نهاية كود إنشاء الحساب
           ],
         ),
       ),

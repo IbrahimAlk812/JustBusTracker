@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:just_bus_tracker/screens/driver/driver_home_screen.dart';
 import 'package:just_bus_tracker/screens/student/bus_list_view_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:just_bus_tracker/screens/student/login_screen.dart';
+import 'package:just_bus_tracker/screens/auth/login_screen.dart';
 import 'package:just_bus_tracker/screens/student/student_home_screen.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_dashboard.dart';
 import 'package:just_bus_tracker/screens/supervisor/supervisor_bus_table.dart';
@@ -12,10 +12,9 @@ import 'package:just_bus_tracker/screens/driver/driver_home_screen.dart';
 
 // ... other imports ...
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // تحميل ملف البيئة أولاً
   await dotenv.load(fileName: ".env");
 
@@ -41,7 +40,7 @@ class MyApp extends StatelessWidget {
       //home: const StudentHomeScreen(),
       //home: const SupervisorDashboard()
       //home: const DriverHomeScreen()
-      home: const LoginScreen()
+      home: const LoginScreen(),
     );
   }
 }

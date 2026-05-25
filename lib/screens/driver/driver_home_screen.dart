@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 // سنقوم بإنشاء هذه الملفات في الخطوات القادمة
 import 'package:just_bus_tracker/screens/driver/driver_map_tracking_view.dart';
 import 'package:just_bus_tracker/screens/driver/driver_complaints_view.dart';
-import 'package:just_bus_tracker/screens/student/profile_view.dart'; // إعادة استخدام شاشة الحساب إذا كانت عامة
+import 'package:just_bus_tracker/screens/student/student_profile_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({Key? key}) : super(key: key);
@@ -17,8 +17,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   // قائمة الشاشات التي سيتنقل بينها السائق
   final List<Widget> _screens = [
     const DriverMapTrackingView(), // 🗺️ شاشة الرحلة الحالية (الخريطة + التتبع)
-    const DriverComplaintsView(),  // ⚠️ شاشة الشكاوى والأعطال
-    const ProfileView(),           // 👤 شاشة الحساب
+    const DriverComplaintsView(), // ⚠️ شاشة الشكاوى والأعطال
+    const StudentProfileScreen(),
   ];
 
   @override
@@ -43,10 +43,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
             icon: Icon(Icons.report_problem),
             label: 'الشكاوى',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'حسابي',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'حسابي'),
         ],
       ),
     );

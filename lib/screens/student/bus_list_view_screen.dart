@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:just_bus_tracker/services/database_service.dart'; 
+import 'package:geolocator/geolocator.dart'; // 🌟 مكتبة حساب المسافات
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 للاتصال الحي
+import 'package:just_bus_tracker/services/database_service.dart';
 
 class BusListViewScreen extends StatefulWidget {
   const BusListViewScreen({super.key});
@@ -10,17 +13,72 @@ class BusListViewScreen extends StatefulWidget {
 
 class _BusListViewScreenState extends State<BusListViewScreen> {
   final DatabaseService _dbService = DatabaseService();
-  
+
   late Future<List<Map<String, dynamic>>> _busesFuture;
-  String? _bookedBusId; // 🌟 متغير لحفظ رقم الباص الذي حجزه الطالب
+  String? _bookedBusId;
+
+  // 🌟 متغيرات حساب الوقت المتوقع للوصول (ETA)
+  Map<String, String> _busEtas = {};
+  StreamSubscription? _etaSubscription;
+  static const double technoLat = 32.4939; // إحداثيات التكنو
+  static const double technoLng = 35.9890;
 
   @override
   void initState() {
     super.initState();
     _refreshBuses();
+    _startListeningToETAs(); // 🌟 تشغيل رادار الوقت فور فتح الشاشة
   }
 
-  // 🌟 دالة تقوم بتحديث قائمة الباصات ومعرفة حالة حجز الطالب في نفس الوقت
+  @override
+  void dispose() {
+    _etaSubscription
+        ?.cancel(); // 🌟 إيقاف الرادار عند الخروج للحفاظ على البطارية
+    super.dispose();
+  }
+
+  // 🌟 دالة رادار الخلفية لحساب وقت وصول كل باص بشكل منفصل
+  void _startListeningToETAs() {
+    _etaSubscription = Supabase.instance.client
+        .from('bus_locations')
+        .stream(primaryKey: ['id'])
+        .listen((List<Map<String, dynamic>> data) {
+          Map<String, String> updatedEtas = {};
+
+          for (var loc in data) {
+            final String busId = loc['bus_id']?.toString() ?? '';
+            final double? lat = double.tryParse(
+              loc['latitude']?.toString() ?? '',
+            );
+            final double? lng = double.tryParse(
+              loc['longitude']?.toString() ?? '',
+            );
+
+            if (busId.isNotEmpty && lat != null && lng != null) {
+              // حساب المسافة بالمعادلة الهندسية
+              double distanceInMeters = Geolocator.distanceBetween(
+                lat,
+                lng,
+                technoLat,
+                technoLng,
+              );
+              // افتراض سرعة 40 كم/س
+              int etaMinutes = ((distanceInMeters / 1000) / 40 * 60).round();
+
+              updatedEtas[busId] = etaMinutes <= 1
+                  ? 'وصل تقريباً 🏁'
+                  : '$etaMinutes دقيقة';
+            }
+          }
+
+          if (mounted) {
+            setState(() {
+              _busEtas = updatedEtas;
+            });
+          }
+        });
+  }
+
   void _refreshBuses() {
     setState(() {
       _busesFuture = _dbService.getBuses();
@@ -28,7 +86,6 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     _loadUserReservation();
   }
 
-  // 🌟 جلب رقم الباص المحجوز لتلوين الزر
   Future<void> _loadUserReservation() async {
     final busId = await _dbService.getUserBookedBusId();
     if (mounted) {
@@ -53,15 +110,17 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     _showNotification('جاري تأكيد الحجز...', true);
 
     final status = await _dbService.bookSeat(busId);
-
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     if (status == 'success') {
       _showNotification('تم حجز مقعدك بنجاح! 🚌', true);
-      _refreshBuses(); // سيتم التحديث وتلوين الزر فوراً
+      _refreshBuses();
     } else if (status == 'already_booked') {
-      _showNotification('لقد قمت بحجز مقعد مسبقاً! لا يمكنك الحجز أكثر من مرة.', false);
-      _loadUserReservation(); // لمعرفة الباص وتلوينه في حال كان محجوزاً مسبقاً
+      _showNotification(
+        'لقد قمت بحجز مقعد مسبقاً! لا يمكنك الحجز أكثر من مرة.',
+        false,
+      );
+      _loadUserReservation();
     } else if (status == 'full') {
       _showNotification('عذراً، الباص ممتلئ بالكامل.', false);
     } else if (status == 'error_not_logged_in') {
@@ -71,7 +130,6 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     }
   }
 
-// معالجة منطق إلغاء الحجز
   Future<void> _processCancellation(String busId) async {
     _showNotification('جاري إلغاء الحجز...', true);
 
@@ -80,24 +138,28 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
 
     if (status == 'success') {
       _showNotification('تم إلغاء الحجز بنجاح.', true);
-      _refreshBuses(); // تحديث الشاشة لإرجاع الزر لحالته الطبيعية
+      _refreshBuses();
     } else {
       _showNotification('حدث خطأ أثناء الإلغاء، يرجى المحاولة لاحقاً.', false);
     }
   }
 
-  // إظهار نافذة التحذير قبل الإلغاء
   void _showCancelDialog(String busId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
           title: const Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
               SizedBox(width: 10),
-              Text('تأكيد إلغاء الحجز', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'تأكيد إلغاء الحجز',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: const Text(
@@ -107,22 +169,26 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(), // إغلاق النافذة
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('تراجع', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // إغلاق النافذة
-                _processCancellation(busId); // تنفيذ الإلغاء
+                Navigator.of(context).pop();
+                _processCancellation(busId);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('نعم، قم بالإلغاء', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'نعم، قم بالإلغاء',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,7 +207,6 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
           ),
         ),
       ),
-      
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _busesFuture,
         builder: (context, snapshot) {
@@ -155,28 +220,37 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
             return const Center(child: Text('لا يوجد باصات متاحة حالياً.'));
           }
 
-          final buses = snapshot.data!;
+          final buses = List<Map<String, dynamic>>.from(snapshot.data!);
+
+          if (_bookedBusId != null) {
+            buses.sort((a, b) {
+              if (a['id'].toString() == _bookedBusId) return -1;
+              if (b['id'].toString() == _bookedBusId) return 1;
+              return 0;
+            });
+          }
 
           return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: buses.length,
             itemBuilder: (context, index) {
               final bus = buses[index];
-              
-              final String busId = bus['id'].toString(); 
+              final String busId = bus['id'].toString();
               final String busNumber = bus['bus_number']?.toString() ?? 'N/A';
-              final String routeName = bus['route']?.toString() ?? 'مسار غير محدد';
-              
-              final int maxCapacity = int.tryParse(bus['capacity']?.toString() ?? '0') ?? 0;
-              final int currentPassengers = int.tryParse(bus['current_passengers']?.toString() ?? '0') ?? 0;
-              
+              final String routeName =
+                  bus['route']?.toString() ?? 'مسار غير محدد';
+              final int maxCapacity =
+                  int.tryParse(bus['capacity']?.toString() ?? '0') ?? 0;
+              final int currentPassengers =
+                  int.tryParse(bus['current_passengers']?.toString() ?? '0') ??
+                  0;
               final int availableSeats = maxCapacity - currentPassengers;
               final bool isFull = availableSeats <= 0;
 
               return _buildBusCard(
-                busId,       
-                busNumber,   
-                routeName,   
+                busId,
+                busNumber,
+                routeName,
                 availableSeats,
                 isFull,
               );
@@ -193,30 +267,27 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     String routeName,
     int availableSeats,
     bool isFull,
-  ) { 
-    // 🌟 الهندسة المنطقية لحالة الأزرار
-    bool isBookedByMe = (id == _bookedBusId); // هل أنا حجزت هذا الباص تحديداً؟
-    bool hasBookedAnyBus = (_bookedBusId != null); // هل أنا حجزت أي باص بشكل عام؟
+  ) {
+    bool isBookedByMe = (id == _bookedBusId);
+    bool hasBookedAnyBus = (_bookedBusId != null);
 
-    // تحديد لون ونص الزر بناءً على الحالة
     Color buttonColor;
     String buttonText;
 
     if (isBookedByMe) {
-      buttonColor = Colors.green; // لون أخضر للباص المحجوز
+      buttonColor = Colors.green;
       buttonText = 'تم الحجز ✔️';
     } else if (isFull) {
       buttonColor = Colors.grey;
       buttonText = 'ممتلئ';
     } else if (hasBookedAnyBus) {
-      buttonColor = Colors.grey.shade400; // لون باهت لباقي الباصات لمنع حجزها
+      buttonColor = Colors.grey.shade400;
       buttonText = 'احجز الآن';
     } else {
-      buttonColor = const Color(0xFF1A237E); // اللون الأزرق الطبيعي إذا لم يحجز شيئاً
+      buttonColor = const Color(0xFF1A237E);
       buttonText = 'احجز الآن';
     }
 
-    // تعطيل الزر إذا كان ممتلئاً أو إذا كان الطالب قد حجز بالفعل
     bool isButtonDisabled = isFull || hasBookedAnyBus;
 
     return Container(
@@ -244,13 +315,26 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'باص رقم $busNumber', 
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        textDirection: TextDirection.rtl,
+                        children: [
+                          const Text(
+                            'باص رقم ',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            busNumber,
+                            style: const TextStyle(
+                              color: Color(0xFF1A237E),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
                         routeName,
@@ -267,45 +351,75 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
             const Divider(height: 25),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment:
+                  CrossAxisAlignment.end, // 🌟 لجعل الزر محاذياً من الأسفل
               children: [
-                Row(
+                // 🌟 تحويل المقاعد والوقت إلى عمود (Column)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.event_seat,
-                      size: 18,
-                      color: isFull ? Colors.red : Colors.blueGrey,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.event_seat,
+                          size: 18,
+                          color: isFull ? Colors.red : Colors.blueGrey,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          isFull ? 'ممتلئ' : '$availableSeats مقاعد متاحة',
+                          style: TextStyle(
+                            color: isFull ? Colors.red : Colors.blueGrey,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      isFull ? 'ممتلئ' : '$availableSeats مقاعد متاحة',
-                      style: TextStyle(
-                        color: isFull ? Colors.red : Colors.blueGrey,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const SizedBox(height: 8), // مسافة أنيقة بين المقاعد والوقت
+                    // 🌟 إضافة سطر الوقت المتوقع
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 18,
+                          color: Colors.teal,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'الوصول: ${_busEtas[id] ?? 'جاري الحساب...'}',
+                          style: const TextStyle(
+                            color: Colors.teal,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 ElevatedButton(
-                  // 🌟 إذا كان الباص محجوزاً من قبلي، أسمح بالضغط لإلغائه
-                  onPressed: (isButtonDisabled && !isBookedByMe) 
-                      ? null 
+                  onPressed: (isButtonDisabled && !isBookedByMe)
+                      ? null
                       : () {
                           if (isBookedByMe) {
-                            _showCancelDialog(id); // فتح رسالة التحذير
+                            _showCancelDialog(id);
                           } else {
-                            _processBooking(id); // عملية الحجز الطبيعية
+                            _processBooking(id);
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor, 
-                    disabledBackgroundColor: buttonColor, 
+                    backgroundColor: buttonColor,
+                    disabledBackgroundColor: buttonColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: Text(
-                    buttonText, 
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    buttonText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

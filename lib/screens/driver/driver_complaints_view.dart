@@ -10,58 +10,71 @@ class DriverComplaintsView extends StatefulWidget {
 
 class _DriverComplaintsViewState extends State<DriverComplaintsView> {
   final TextEditingController _descriptionController = TextEditingController();
-  
+
   // أنواع البلاغات المتاحة للسائق
   final List<String> _complaintTypes = [
     'عطل فني في الباص',
     'أزمة سير خانقة / تأخير',
     'حادث مروري',
-    'أخرى'
+    'أخرى',
   ];
+  final TextEditingController _detailsController = TextEditingController();
+
   String? _selectedType;
   bool _isLoading = false;
 
-  // 🚀 دالة إرسال الشكوى إلى قاعدة البيانات
   Future<void> _submitComplaint() async {
-    if (_selectedType == null || _descriptionController.text.trim().isEmpty) {
-      _showSnackBar('الرجاء اختيار نوع البلاغ وكتابة التفاصيل', isError: true);
+    // تأكد من تغيير أسماء المتغيرات (مثل _detailsController و _selectedType) لتطابق الأسماء الموجودة في كودك
+    if (_detailsController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('الرجاء كتابة التفاصيل أولاً')),
+      );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // الحصول على الـ ID الخاص بالسائق الحالي
       final userId = Supabase.instance.client.auth.currentUser?.id;
 
-      // إرسال البيانات لجدول complaints
+      // 🌟 دمج نوع البلاغ مع التفاصيل في رسالة واحدة لكي نقبلها في عمود message
+      String finalMessage =
+          "نوع البلاغ: $_selectedType\nالتفاصيل: ${_detailsController.text.trim()}";
+
       await Supabase.instance.client.from('complaints').insert({
-        'user_id': userId, // ربط الشكوى بالسائق
-        'type': _selectedType, // نوع العطل
-        'description': _descriptionController.text.trim(), // التفاصيل
-        'status': 'Pending', // حالة الطلب مبدئياً
-        // 'bus_id': '...', // يمكنك إرسال رقم الباص أيضاً إذا كان محفوظاً
+        'user_id': userId,
+        'message': finalMessage,
+        'created_at': DateTime.now()
+            .toIso8601String(), // استخدام الاسم الصحيح للوقت
+        'status': 'pending',
+        'bus_number': 'غير محدد', // لتفادي خطأ الـ Null الذي أصلحناه سابقاً
       });
 
-      _showSnackBar('تم إرسال البلاغ بنجاح إلى المشرف');
-      
-      // تفريغ الحقول بعد الإرسال
-      setState(() {
-        _selectedType = null;
-        _descriptionController.clear();
-      });
-      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال البلاغ بنجاح!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _detailsController.clear();
+    } on PostgrestException catch (e) {
+      // 🌟 طباعة الخطأ الحقيقي من قاعدة البيانات لكي نعرفه فوراً
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في قاعدة البيانات: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
-      debugPrint('خطأ في إرسال البلاغ: $e');
-      _showSnackBar('حدث خطأ أثناء الإرسال، حاول مرة أخرى', isError: true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ غير متوقع: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -86,7 +99,10 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('الإبلاغ عن مشكلة', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'الإبلاغ عن مشكلة',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -103,7 +119,11 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
           children: [
             const Text(
               'نوع البلاغ',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A237E),
+              ),
             ),
             const SizedBox(height: 10),
             // قائمة منسدلة لاختيار نوع المشكلة
@@ -134,15 +154,19 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
               ),
             ),
             const SizedBox(height: 25),
-            
+
             const Text(
               'تفاصيل المشكلة',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A237E),
+              ),
             ),
             const SizedBox(height: 10),
             // حقل النص التفصيلي
             TextField(
-              controller: _descriptionController,
+              controller: _detailsController,
               maxLines: 5,
               decoration: InputDecoration(
                 hintText: 'اكتب تفاصيل المشكلة هنا لمساعدتنا في حلها بسرعة...',
@@ -163,7 +187,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
               ),
             ),
             const SizedBox(height: 40),
-            
+
             // زر الإرسال
             SizedBox(
               width: double.infinity,
@@ -181,7 +205,11 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
                         'إرسال البلاغ',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
               ),
             ),
