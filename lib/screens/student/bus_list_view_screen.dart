@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart'; // 🌟 مكتبة حساب المسافات
-import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 للاتصال الحي
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:just_bus_tracker/services/database_service.dart';
 
 class BusListViewScreen extends StatefulWidget {
@@ -20,6 +20,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
   // 🌟 متغيرات حساب الوقت المتوقع للوصول (ETA)
   Map<String, String> _busEtas = {};
   StreamSubscription? _etaSubscription;
+  StreamSubscription? _reservationSubscription; // 🌟 إضافة رادار الحجوزات الحي
   static const double technoLat = 32.4939; // إحداثيات التكنو
   static const double technoLng = 35.9890;
 
@@ -27,14 +28,44 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
   void initState() {
     super.initState();
     _refreshBuses();
-    _startListeningToETAs(); // 🌟 تشغيل رادار الوقت فور فتح الشاشة
+    _startListeningToETAs();
+    _startListeningToUserReservation(); // 🌟 تشغيل رادار مراقبة الحجز فور فتح الشاشة
   }
 
   @override
   void dispose() {
-    _etaSubscription
-        ?.cancel(); // 🌟 إيقاف الرادار عند الخروج للحفاظ على البطارية
+    _etaSubscription?.cancel();
+    _reservationSubscription
+        ?.cancel(); // 🌟 إيقاف رادار الحجز للحفاظ على البطارية
     super.dispose();
+  }
+
+  // 🌟 دالة رادار الخلفية لمراقبة حالة الحجز حياً (التعديل الجوهري لحل مشكلة التزامن)
+  void _startListeningToUserReservation() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _reservationSubscription = Supabase.instance.client
+        .from('reservations')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .listen((List<Map<String, dynamic>> data) {
+          // البحث عن أي حجز حالته "نشط"
+          final activeResList = data
+              .where((res) => res['status'] == 'نشط')
+              .toList();
+
+          if (mounted) {
+            setState(() {
+              if (activeResList.isNotEmpty) {
+                _bookedBusId = activeResList.first['bus_id']?.toString();
+              } else {
+                _bookedBusId =
+                    null; // إذا لم يجد حجز نشط، يفرغ المتغير وتفتح الأزرار
+              }
+            });
+          }
+        });
   }
 
   // 🌟 دالة رادار الخلفية لحساب وقت وصول كل باص بشكل منفصل
@@ -55,14 +86,12 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
             );
 
             if (busId.isNotEmpty && lat != null && lng != null) {
-              // حساب المسافة بالمعادلة الهندسية
               double distanceInMeters = Geolocator.distanceBetween(
                 lat,
                 lng,
                 technoLat,
                 technoLng,
               );
-              // افتراض سرعة 40 كم/س
               int etaMinutes = ((distanceInMeters / 1000) / 40 * 60).round();
 
               updatedEtas[busId] = etaMinutes <= 1
@@ -83,16 +112,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
     setState(() {
       _busesFuture = _dbService.getBuses();
     });
-    _loadUserReservation();
-  }
-
-  Future<void> _loadUserReservation() async {
-    final busId = await _dbService.getUserBookedBusId();
-    if (mounted) {
-      setState(() {
-        _bookedBusId = busId;
-      });
-    }
+    // تم إزالة الاستدعاء القديم لأن الرادار الحي (_startListeningToUserReservation) يتكفل بالمهمة الآن
   }
 
   void _showNotification(String message, bool success) {
@@ -120,7 +140,6 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
         'لقد قمت بحجز مقعد مسبقاً! لا يمكنك الحجز أكثر من مرة.',
         false,
       );
-      _loadUserReservation();
     } else if (status == 'full') {
       _showNotification('عذراً، الباص ممتلئ بالكامل.', false);
     } else if (status == 'error_not_logged_in') {
@@ -202,7 +221,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),
@@ -284,7 +303,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
       buttonColor = Colors.grey.shade400;
       buttonText = 'احجز الآن';
     } else {
-      buttonColor = const Color(0xFF1A237E);
+      buttonColor = const Color(0xFF246BFD);
       buttonText = 'احجز الآن';
     }
 
@@ -307,7 +326,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
               children: [
                 const Icon(
                   Icons.directions_bus,
-                  color: Color(0xFF1A237E),
+                  color: Color(0xFF246BFD),
                   size: 30,
                 ),
                 const SizedBox(width: 15),
@@ -329,7 +348,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                           Text(
                             busNumber,
                             style: const TextStyle(
-                              color: Color(0xFF1A237E),
+                              color: Color(0xFF246BFD),
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),
@@ -351,10 +370,8 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
             const Divider(height: 25),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment:
-                  CrossAxisAlignment.end, // 🌟 لجعل الزر محاذياً من الأسفل
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // 🌟 تحويل المقاعد والوقت إلى عمود (Column)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -375,8 +392,7 @@ class _BusListViewScreenState extends State<BusListViewScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8), // مسافة أنيقة بين المقاعد والوقت
-                    // 🌟 إضافة سطر الوقت المتوقع
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(

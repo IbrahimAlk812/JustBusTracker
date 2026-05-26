@@ -103,7 +103,7 @@ class _StudentMapViewState extends State<StudentMapView> {
     // 3. رسم لوحة خلف الرقم بحجم مضاعف
     const double labelWidth = 160.0;
     const double labelHeight = 70.0;
-    final Paint labelPaint = Paint()..color = const Color(0xFF1A237E);
+    final Paint labelPaint = Paint()..color = const Color(0xFF246BFD);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(
@@ -280,7 +280,7 @@ class _StudentMapViewState extends State<StudentMapView> {
         ),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color(0xFF1A237E),
+        backgroundColor: const Color(0xFF246BFD),
         foregroundColor: Colors.white,
       ),
       body: Stack(

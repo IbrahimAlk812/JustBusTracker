@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 🌟 إضافة استدعاء سوبابيس
-import 'package:audioplayers/audioplayers.dart'; // 🌟 إضافة استدعاء مكتبة الصوت
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'supervisor_statistics_view.dart';
 import 'supervisor_bus_table.dart';
 import 'complaints_view.dart';
+import 'supervisor_map_view.dart';
 import 'package:just_bus_tracker/screens/supervisor/accounts_management_view.dart';
-import 'package:just_bus_tracker/screens/supervisor/supervisor_map_view.dart';
 
 class SupervisorDashboard extends StatefulWidget {
   const SupervisorDashboard({super.key});
@@ -17,24 +17,23 @@ class SupervisorDashboard extends StatefulWidget {
 class _SupervisorDashboardState extends State<SupervisorDashboard> {
   int _currentIndex = 0;
 
-  // 🌟 إعدادات الرادار والصوت الجديدة
+  // إعدادات الرادار والصوت
   final AudioPlayer _audioPlayer = AudioPlayer();
-  String?
-  _lastNotificationId; // لمنع تكرار تشغيل الصوت لنفس الإشعار عند تحديث الشاشة
+  String? _lastNotificationId; // لمنع تكرار تشغيل الصوت لنفس الإشعار
 
-  // 🌟 قائمة الشاشات (تم إضافة شاشة إدارة الحسابات كعنصر رابع هنا)
+  // 🌟 مصفوفة الواجهات بالترتيب الهندي الجديد والمطلوب 100%
   final List<Widget> _pages = [
-    const SupervisorStatisticsView(),
-    const SupervisorBusTable(),
-    const ComplaintsView(),
-    const AccountsManagementView(),
-    const SupervisorMapView(), // الشاشة الخامسة
+    const SupervisorStatisticsView(), // Index 0: الإحصائيات
+    const SupervisorBusTable(), // Index 1: الباصات
+    const SupervisorMapView(), // Index 2: الخريطة
+    const ComplaintsView(), // Index 3: الشكاوى
+    const AccountsManagementView(), // Index 4: الحسابات (تتضمن حسابي بالداخل)
   ];
 
   @override
   void initState() {
     super.initState();
-    // 🌟 بدء تشغيل الرادار فور فتح واجهة المشرف
+    // بدء تشغيل الرادار فور فتح واجهة المشرف
     _listenToCancellations();
   }
 
@@ -42,24 +41,19 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
   void _listenToCancellations() {
     Supabase.instance.client
         .from('notifications')
-        .stream(
-          primaryKey: ['notification_id'],
-        ) // ⚠️ إذا كان اسم المفتاح الأساسي للجدول في سوبابيس هو id فقط قم بتغييرها لـ ['id']
+        .stream(primaryKey: ['notification_id'])
         .order('date_time', ascending: false)
         .listen((List<Map<String, dynamic>> data) {
           if (data.isNotEmpty) {
             final latestNotification = data.first;
-            // جلب معرّف الإشعار الحالي
             final String currentNotificationId =
                 latestNotification['notification_id']?.toString() ??
                 latestNotification['id']?.toString() ??
                 '';
 
-            // التحقق من نوع الإشعار، والتأكد من أنه إشعار جديد لم نقم بالتنبيه عليه قبل ثوانٍ
             if (latestNotification['type'] == 'cancellation' &&
                 currentNotificationId != _lastNotificationId) {
-              _lastNotificationId =
-                  currentNotificationId; // توثيق الإشعار لمنع التكرار
+              _lastNotificationId = currentNotificationId;
 
               _playAlertSound(); // 🔊 تشغيل الصوت
               _showSupervisorAlert(
@@ -70,10 +64,9 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
         });
   }
 
-  // 🔊 دالة تشغيل صوت التنبيه المحدثة والآمنة
+  // 🔊 دالة تشغيل صوت التنبيه الآمنة
   Future<void> _playAlertSound() async {
     try {
-      // إجبار المحرك على تهيئة الصوت كمادة تنبيه قوية
       await _audioPlayer.setAudioContext(
         AudioContext(
           android: AudioContextAndroid(
@@ -85,25 +78,22 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           iOS: AudioContextIOS(),
         ),
       );
-
-      // تشغيل الملف من المجلد المحلي
       await _audioPlayer.play(AssetSource('sounds/alert.mp3'));
     } catch (e) {
       debugPrint("🔥 خطأ في تشغيل الصوت: $e");
     }
   }
 
-  // ⚠️ دالة إظهار نافذة التنبيه المنسقة والاحترافية
+  // ⚠️ دالة إظهار نافذة التنبيه المنسقة
   void _showSupervisorAlert(String message) {
     if (!mounted) return;
 
     showDialog(
       context: context,
-      barrierDismissible: false, // إجبار المشرف على الضغط على الزر
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return Directionality(
-          textDirection: TextDirection
-              .rtl, // إجبار النافذة بالكامل على الاتجاه العربي الصحيح
+          textDirection: TextDirection.rtl,
           child: AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
@@ -144,7 +134,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               ),
               child: Text(
                 message,
-                textAlign: TextAlign.right, // محاذاة النص لليمين
+                textAlign: TextAlign.right,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -159,9 +149,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
               bottom: 16,
             ),
             actions: [
-              Spacer(),
               SizedBox(
-                width: double.infinity, // جعل الزر ممتداً ليسهل النقر عليه
+                width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -191,8 +180,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   @override
   void dispose() {
-    _audioPlayer
-        .dispose(); // 🌟 إغلاق محرك الصوت بأمان عند الخروج من التطبيق لتجنب تسريب الذاكرة
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -202,19 +190,26 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        type: BottomNavigationBarType.fixed, // مهم جداً عشان تظهر الأيقونات
-        onTap: (index) => setState(() => _currentIndex = index),
-        selectedItemColor: Colors.blue[900],
+        type: BottomNavigationBarType
+            .fixed, // يضمن ثبات وظهور الأيقونات الخمسة معاً
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        selectedItemColor: const Color(0xFF246BFD),
         unselectedItemColor: Colors.grey,
+        // 🌟 ترتيب العناصر المطابق تماماً لترتيب المصفوفة بالأعلى
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'الإحصائيات',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.table_chart),
+            icon: Icon(Icons.directions_bus),
             label: 'الباصات',
           ),
+          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'الخريطة'),
           BottomNavigationBarItem(
             icon: Icon(Icons.report_problem),
             label: 'الشكاوى',
@@ -223,7 +218,6 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
             icon: Icon(Icons.manage_accounts),
             label: 'الحسابات',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'الخريطة'),
         ],
       ),
     );

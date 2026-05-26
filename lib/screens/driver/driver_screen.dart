@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class DriverScreen extends StatefulWidget {
   // المعرّف الخاص بباص السائق (يمكن تمريره عند تسجيل الدخول)
   // وضعنا UUID الباص B-101 كمثال للتجربة الفورية
-  final String busId = '317bdd6f-0e79-4578-8cd2-0acdc2214176'; 
+  final String busId = '317bdd6f-0e79-4578-8cd2-0acdc2214176';
 
   const DriverScreen({Key? key}) : super(key: key);
 
@@ -37,7 +37,10 @@ class _DriverScreenState extends State<DriverScreen> {
       }
     }
     if (permission == LocationPermission.deniedForever) {
-      _showSnackBar('صلاحيات الموقع مرفوضة نهائياً من إعدادات الهاتف', isError: true);
+      _showSnackBar(
+        'صلاحيات الموقع مرفوضة نهائياً من إعدادات الهاتف',
+        isError: true,
+      );
       return false;
     }
     return true;
@@ -55,29 +58,35 @@ class _DriverScreenState extends State<DriverScreen> {
     // إعدادات الـ GPS: تحديث الموقع كلما تحرك السائق 10 أمتار
     final LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10, 
+      distanceFilter: 10,
     );
 
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((Position? position) async {
-      if (position != null) {
-        // إرسال الإحداثيات الجديدة إلى Supabase في الخلفية
-        try {
-          await Supabase.instance.client
-              .from('bus_locations')
-              .update({
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-              })
-              .eq('bus_id', widget.busId); // تحديث سطر الباص الخاص بهذا السائق
-              
-          debugPrint('تم تحديث الموقع: ${position.latitude}, ${position.longitude}');
-        } catch (e) {
-          debugPrint('خطأ في إرسال الموقع: $e');
-        }
-      }
-    });
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: locationSettings,
+        ).listen((Position? position) async {
+          if (position != null) {
+            // إرسال الإحداثيات الجديدة إلى Supabase في الخلفية
+            try {
+              await Supabase.instance.client
+                  .from('bus_locations')
+                  .update({
+                    'latitude': position.latitude,
+                    'longitude': position.longitude,
+                  })
+                  .eq(
+                    'bus_id',
+                    widget.busId,
+                  ); // تحديث سطر الباص الخاص بهذا السائق
+
+              debugPrint(
+                'تم تحديث الموقع: ${position.latitude}, ${position.longitude}',
+              );
+            } catch (e) {
+              debugPrint('خطأ في إرسال الموقع: $e');
+            }
+          }
+        });
   }
 
   // 🛑 دالة إيقاف البث (إنهاء الرحلة)
@@ -108,12 +117,15 @@ class _DriverScreenState extends State<DriverScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('لوحة قيادة السائق', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'لوحة قيادة السائق',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),
@@ -130,7 +142,9 @@ class _DriverScreenState extends State<DriverScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              _isTracking ? 'يتم الآن بث الموقع للطلاب...' : 'نظام التتبع متوقف',
+              _isTracking
+                  ? 'يتم الآن بث الموقع للطلاب...'
+                  : 'نظام التتبع متوقف',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -138,7 +152,7 @@ class _DriverScreenState extends State<DriverScreen> {
               ),
             ),
             const SizedBox(height: 50),
-            
+
             // زر البداية والنهاية الكبير
             GestureDetector(
               onTap: _isTracking ? _stopTracking : _startTracking,
@@ -148,10 +162,12 @@ class _DriverScreenState extends State<DriverScreen> {
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isTracking ? Colors.red : const Color(0xFF1A237E),
+                  color: _isTracking ? Colors.red : const Color(0xFF246BFD),
                   boxShadow: [
                     BoxShadow(
-                      color: (_isTracking ? Colors.red : const Color(0xFF1A237E)).withOpacity(0.4),
+                      color:
+                          (_isTracking ? Colors.red : const Color(0xFF246BFD))
+                              .withOpacity(0.4),
                       spreadRadius: 10,
                       blurRadius: 20,
                     ),

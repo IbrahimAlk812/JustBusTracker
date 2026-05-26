@@ -108,7 +108,7 @@ class ComplaintsView extends StatelessWidget {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),

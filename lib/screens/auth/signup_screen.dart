@@ -100,7 +100,7 @@ class _SignupScreenState extends State<SignupScreen> {
       appBar: AppBar(
         title: const Text('إنشاء حساب جديد'),
         centerTitle: true,
-        backgroundColor: const Color(0xFF1A237E),
+        backgroundColor: const Color(0xFF246BFD),
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
@@ -184,7 +184,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 : ElevatedButton(
                     onPressed: _signUp,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A237E),
+                      backgroundColor: const Color(0xFF246BFD),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                     ),
                     child: const Text(

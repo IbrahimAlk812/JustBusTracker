@@ -24,10 +24,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens, // أو اسم المصفوفة التي تحتوي على شاشات السائق لديك
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        selectedItemColor: const Color(0xFF1A237E), // لون الجامعة
+        selectedItemColor: const Color(0xFF246BFD), // لون الجامعة
         unselectedItemColor: Colors.grey,
         onTap: (index) {
           setState(() {

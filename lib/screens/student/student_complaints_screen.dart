@@ -75,7 +75,7 @@ class _StudentComplaintsScreenState extends State<StudentComplaintsScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),
@@ -117,7 +117,7 @@ class _StudentComplaintsScreenState extends State<StudentComplaintsScreen> {
             ElevatedButton(
               onPressed: _isLoading ? null : _submitComplaint,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A237E),
+                backgroundColor: const Color(0xFF246BFD),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),

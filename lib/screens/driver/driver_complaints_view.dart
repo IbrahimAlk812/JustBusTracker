@@ -107,7 +107,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),
@@ -122,7 +122,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A237E),
+                color: Color(0xFF246BFD),
               ),
             ),
             const SizedBox(height: 10),
@@ -160,7 +160,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A237E),
+                color: Color(0xFF246BFD),
               ),
             ),
             const SizedBox(height: 10),
@@ -182,7 +182,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: Color(0xFF1A237E)),
+                  borderSide: const BorderSide(color: Color(0xFF246BFD)),
                 ),
               ),
             ),
@@ -195,7 +195,7 @@ class _DriverComplaintsViewState extends State<DriverComplaintsView> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submitComplaint,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A237E),
+                  backgroundColor: const Color(0xFF246BFD),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

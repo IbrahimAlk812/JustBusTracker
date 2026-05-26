@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 import 'package:just_bus_tracker/screens/student/bus_list_view_screen.dart';
+import 'package:just_bus_tracker/screens/student/my_reservations_view.dart'; // 🌟 إضافة شاشة رحلتي
 import 'package:just_bus_tracker/screens/student/bus_map_view.dart';
 import 'package:just_bus_tracker/screens/student/student_complaints_screen.dart';
 import 'package:just_bus_tracker/screens/student/student_profile_screen.dart';
@@ -24,8 +25,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   final Set<String> _knownResolvedIds = {};
   bool _isFirstLoad = true;
 
+  // 🌟 تم تحديث القائمة لتشمل 5 شاشات بالترتيب
   final List<Widget> _screens = [
     const BusListViewScreen(),
+    const MyReservationsView(), // 🌟 الشاشة الجديدة كعنصر ثاني
     const StudentMapView(),
     const StudentComplaintsScreen(),
     const StudentProfileScreen(),
@@ -121,7 +124,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               'حسنًا',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1A237E),
+                color: Color(0xFF246BFD),
               ),
             ),
           ),
@@ -137,13 +140,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF1A237E),
+        selectedItemColor: const Color(0xFF246BFD),
         unselectedItemColor: Colors.grey,
         onTap: (index) => setState(() => _currentIndex = index),
+        // 🌟 إضافة التبويب الجديد ليكون مطابقاً لترتيب المصفوفة أعلاه
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.directions_bus),
             label: 'الباصات',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.confirmation_number), // أيقونة التذكرة للرحلة
+            label: 'رحلتي',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'التتبع'),
           BottomNavigationBarItem(

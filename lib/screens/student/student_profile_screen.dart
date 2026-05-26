@@ -62,7 +62,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
+              colors: [Color(0xFF246BFD), Color(0xFF5A8BFF)],
             ),
           ),
         ),
@@ -75,7 +75,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 children: [
                   const CircleAvatar(
                     radius: 50,
-                    backgroundColor: Color(0xFF1A237E),
+                    backgroundColor: Color(0xFF246BFD),
                     child: Icon(Icons.person, size: 55, color: Colors.white),
                   ),
                   const SizedBox(height: 15),
@@ -104,7 +104,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                           'المظهر الداكن',
                           trailing: Switch(
                             value: _isDarkMode,
-                            activeColor: const Color(0xFF1A237E),
+                            activeColor: const Color(0xFF246BFD),
                             onChanged: (val) {
                               setState(() => _isDarkMode = val);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -153,7 +153,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     return ListTile(
       leading: iconColor != null
           ? Icon(icon, color: iconColor)
-          : Icon(icon, color: const Color(0xFF1A237E)),
+          : Icon(icon, color: const Color(0xFF246BFD)),
       title: Text(
         title,
         style: TextStyle(fontWeight: FontWeight.w600, color: textColor),

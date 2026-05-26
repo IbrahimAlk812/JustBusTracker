@@ -82,7 +82,7 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
       fit: BoxFit.contain,
     );
 
-    final Paint labelPaint = Paint()..color = const Color(0xFF1A237E);
+    final Paint labelPaint = Paint()..color = const Color(0xFF246BFD);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH((width - 160) / 2, 0, 160, 70),
@@ -200,7 +200,7 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFF1A237E),
+        backgroundColor: const Color(0xFF246BFD),
         foregroundColor: Colors.white,
       ),
       body: GoogleMap(
