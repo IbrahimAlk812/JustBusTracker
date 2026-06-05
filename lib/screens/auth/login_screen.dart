@@ -19,6 +19,67 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingSession(); // 🌟 فحص الجلسة السابقة فور فتح التطبيق
+  }
+
+  // 🌟 دالة الفحص التلقائي
+  Future<void> _checkExistingSession() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      setState(() => _isLoading = true);
+      try {
+        final profileData = await Supabase.instance.client
+            .from('profiles')
+            .select('role, is_approved')
+            .eq('id', user.id)
+            .single();
+
+        final String userRole = profileData['role'];
+        final bool isApproved = profileData['is_approved'] ?? false;
+
+        if (!mounted) return;
+
+        if (!isApproved) {
+          await Supabase.instance.client.auth.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('حسابك قيد المراجعة.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        // التوجيه المباشر حسب الصلاحية
+        if (userRole == 'student') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const StudentHomeScreen()),
+          );
+        } else if (userRole == 'supervisor') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SupervisorDashboard(),
+            ),
+          );
+        } else if (userRole == 'driver') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DriverHomeScreen()),
+          );
+        }
+      } catch (e) {
+        debugPrint('خطأ في استعادة الجلسة: $e');
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   // الدالة المسؤولة عن تسجيل الدخول والتوجيه (تم الحفاظ عليها كاملة 100%)
   Future<void> _loginAndRoute() async {
     setState(() {

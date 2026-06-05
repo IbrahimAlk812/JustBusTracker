@@ -18,6 +18,9 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
   Set<Marker> _allMarkers = {};
 
   Map<String, String> _busNumbersMap = {};
+  // 🌟 ذاكرة مؤقتة لحفظ أسماء الطلاب وتخفيف الضغط على السيرفر
+  Map<String, String> _studentNamesMap = {};
+
   StreamSubscription? _busSubscription;
   StreamSubscription? _studentSubscription;
 
@@ -54,7 +57,7 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
     }
   }
 
-  // دالة رسم أيقونة الباص الضخمة (مكررة من خريطة الطالب)
+  // 🎨 دالة رسم أيقونة الباص الضخمة
   Future<BitmapDescriptor> _generateNumberedBusMarker(String busNumber) async {
     const double width = 360.0;
     const double height = 360.0;
@@ -119,6 +122,29 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
     return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
   }
 
+  // 🎨 الدالة الجديدة: رسم أيقونة الطالب
+  Future<Uint8List> _getBytesFromAsset(String path, int width) async {
+    ByteData data = await rootBundle.load(path);
+    ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+    ui.FrameInfo fi = await codec.getNextFrame();
+    return (await fi.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    ))!.buffer.asUint8List();
+  }
+
+  // 🎨 الدالة الجديدة الخاصة بك
+  Future<BitmapDescriptor> _getStudentMarkerIcon() async {
+    // تحميل صورتك من مجلد الـ assets، وضعنا حجم 120 لكي لا تظهر ضخمة جداً
+    final Uint8List markerIcon = await _getBytesFromAsset(
+      'assets/icons/student_icon.png',
+      120,
+    );
+    return BitmapDescriptor.fromBytes(markerIcon);
+  }
+
   void _startTrackingEverything() {
     // 1. تتبع الباصات
     _busSubscription = Supabase.instance.client
@@ -156,33 +182,60 @@ class _SupervisorMapViewState extends State<SupervisorMapView> {
           if (mounted) setState(() => _allMarkers = currentMarkers);
         });
 
-    // 2. تتبع مواقع الطلاب النشطين
+    // 2. 🌟 تتبع مواقع الطلاب بناءً على الحجوزات النشطة
     _studentSubscription = Supabase.instance.client
-        .from('student_locations')
+        .from('reservations')
         .stream(primaryKey: ['id'])
-        .listen((studentData) {
+        .listen((reservationData) async {
           Set<Marker> currentMarkers = Set.from(
             _allMarkers.where((m) => !m.markerId.value.startsWith('stu_')),
           );
 
-          for (var loc in studentData) {
+          // جلب أيقونة الطالب مرة واحدة
+          BitmapDescriptor studentIcon = await _getStudentMarkerIcon();
+
+          // فلترة الحجوزات لتشمل فقط الحجوزات "النشطة"
+          final activeReservations = reservationData.where(
+            (res) => res['status'] == 'نشط',
+          );
+
+          for (var res in activeReservations) {
             final double? lat = double.tryParse(
-              loc['latitude']?.toString() ?? '',
+              res['latitude']?.toString() ?? '',
             );
             final double? lng = double.tryParse(
-              loc['longitude']?.toString() ?? '',
+              res['longitude']?.toString() ?? '',
             );
-            final String studentId = loc['user_id']?.toString() ?? '';
+            final String studentId = res['user_id']?.toString() ?? '';
+            final String stationName =
+                res['station_name']?.toString() ?? 'محطة طريق';
 
             if (lat != null && lng != null) {
+              // جلب اسم الطالب بذكاء للحفاظ على الأداء
+              if (!_studentNamesMap.containsKey(studentId)) {
+                try {
+                  final profile = await Supabase.instance.client
+                      .from('profiles')
+                      .select('name')
+                      .eq('id', studentId)
+                      .maybeSingle();
+                  _studentNamesMap[studentId] =
+                      profile?['name']?.toString() ?? 'طالب';
+                } catch (e) {
+                  _studentNamesMap[studentId] = 'طالب';
+                }
+              }
+              final studentName = _studentNamesMap[studentId];
+
               currentMarkers.add(
                 Marker(
-                  markerId: MarkerId('stu_$studentId'),
+                  markerId: MarkerId('stu_${res['id']}'),
                   position: LatLng(lat, lng),
-                  icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueAzure,
-                  ), // أيقونة زرقاء للطالب
-                  infoWindow: const InfoWindow(title: 'موقع طالب'),
+                  icon: studentIcon, // 🌟 استخدام الأيقونة الجديدة هنا
+                  infoWindow: InfoWindow(
+                    title: 'الراكب: $studentName',
+                    snippet: 'المحطة: $stationName',
+                  ),
                 ),
               );
             }

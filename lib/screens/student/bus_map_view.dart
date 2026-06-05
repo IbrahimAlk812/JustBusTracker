@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui; // 🌟 محرك الرسم لإنشاء الأيقونات
-import 'dart:typed_data'; // 🌟 للتعامل مع بيانات الصورة
+import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'
-    show rootBundle; // 🌟 لتحميل صورة الأيقونة
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// 🌟 استدعاء خدمة قاعدة البيانات لجلب الأرقام (تأكد من وجود هذا الملف)
 import 'package:just_bus_tracker/services/database_service.dart';
 
 class StudentMapView extends StatefulWidget {
@@ -27,25 +25,26 @@ class _StudentMapViewState extends State<StudentMapView> {
   final Map<String, double> _busBearings = {};
   StreamSubscription? _busLocationsSubscription;
 
-  // 🌟 قاموس لحفظ أرقام الباصات الحقيقية لربطها بالـ UUID
   Map<String, String> _busNumbersMap = {};
 
   static const LatLng _technoUniversityLocation = LatLng(32.4939, 35.9890);
 
+  // 🌟 إضافة متغير لحفظ موقع الطالب الحالي
+  Position? _myLocation;
+
   @override
   void initState() {
     super.initState();
-    _checkAndRequestLocationPermission();
-    // 🌟 أولاً نُحمّل أرقام الباصات، وبعد الانتهاء نُفعّل الرادار
-    _loadAllBusNumbers().then((_) {
-      _startListeningToBusLocations();
+    // 🌟 الترتيب مهم: نجلب موقع الطالب أولاً، ثم نحمل الباصات ونشغل الرادار
+    _checkAndRequestLocationPermission().then((_) {
+      _loadAllBusNumbers().then((_) {
+        _startListeningToBusLocations();
+      });
     });
   }
 
-  // 🌟 دالة لجلب كل الباصات من قاعدة البيانات لمرة واحدة وحفظ أرقامها
   Future<void> _loadAllBusNumbers() async {
     try {
-      // نفترض أن لديك دالة getBuses ترجع قائمة بالباصات
       final List<Map<String, dynamic>> buses = await DatabaseService()
           .getBuses();
       if (buses.isNotEmpty) {
@@ -69,16 +68,13 @@ class _StudentMapViewState extends State<StudentMapView> {
     super.dispose();
   }
 
-  // 🎨 دالة هندسية محدثة: تدمج صورة الباص مع الرقم (بحجم مضاعف 2X)
   Future<BitmapDescriptor> _generateNumberedBusMarker(String busNumber) async {
-    // 🌟 تمت مضاعفة أبعاد اللوحة بالكامل
     const double width = 360.0;
     const double height = 360.0;
 
     final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(pictureRecorder);
 
-    // 1. تحميل صورة الباص الأصلية
     final ByteData data = await rootBundle.load('assets/icons/bus_icon.png');
     final Completer<ui.Image> completer = Completer();
     ui.decodeImageFromList(Uint8List.view(data.buffer), (ui.Image img) {
@@ -86,11 +82,10 @@ class _StudentMapViewState extends State<StudentMapView> {
     });
     final ui.Image busImage = await completer.future;
 
-    // 2. رسم صورة الباص في الوسط بحجم مضاعف (من 130 إلى 260)
     const double imgSize = 260.0;
     paintImage(
       canvas: canvas,
-      rect: const Rect.fromLTWH(
+      rect: Rect.fromLTWH(
         (width - imgSize) / 2,
         (height - imgSize) / 2,
         imgSize,
@@ -100,24 +95,17 @@ class _StudentMapViewState extends State<StudentMapView> {
       fit: BoxFit.contain,
     );
 
-    // 3. رسم لوحة خلف الرقم بحجم مضاعف
     const double labelWidth = 160.0;
     const double labelHeight = 70.0;
     final Paint labelPaint = Paint()..color = const Color(0xFF246BFD);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        const Rect.fromLTWH(
-          (width - labelWidth) / 2,
-          0,
-          labelWidth,
-          labelHeight,
-        ),
-        const Radius.circular(15), // حواف دائرية أكثر نعومة
+        Rect.fromLTWH((width - labelWidth) / 2, 0, labelWidth, labelHeight),
+        const Radius.circular(15),
       ),
       labelPaint,
     );
 
-    // 4. كتابة رقم الباص بخط مضاعف وعملاق (من 24 إلى 48)
     final TextPainter textPainter = TextPainter(
       textDirection: TextDirection.rtl,
       textAlign: TextAlign.center,
@@ -125,14 +113,13 @@ class _StudentMapViewState extends State<StudentMapView> {
     textPainter.text = TextSpan(
       text: busNumber,
       style: const TextStyle(
-        fontSize: 48, // 🌟 خط ضخم جداً
+        fontSize: 48,
         fontWeight: FontWeight.bold,
         color: Colors.white,
         fontFamily: 'Arial',
       ),
     );
     textPainter.layout(minWidth: 0, maxWidth: labelWidth);
-
     textPainter.paint(
       canvas,
       Offset(
@@ -179,9 +166,8 @@ class _StudentMapViewState extends State<StudentMapView> {
               locationData['longitude']?.toString() ?? '',
             );
             final String busUuid =
-                locationData['bus_id']?.toString() ?? 'مجهول'; // المعرف الطويل
+                locationData['bus_id']?.toString() ?? 'مجهول';
 
-            // 🌟 البحث عن رقم الباص الحقيقي بناءً على الـ UUID
             final String busNumber = _busNumbersMap[busUuid] ?? 'مجهول';
 
             if (lat != null && lng != null) {
@@ -200,20 +186,35 @@ class _StudentMapViewState extends State<StudentMapView> {
               }
               _previousBusLocations[busUuid] = newPosition;
 
-              double distanceInKm =
-                  Geolocator.distanceBetween(
-                    lat,
-                    lng,
-                    _technoUniversityLocation.latitude,
-                    _technoUniversityLocation.longitude,
-                  ) /
-                  1000;
-              int etaMinutes = ((distanceInKm / 40) * 60).round();
-              String etaString = etaMinutes <= 1
-                  ? 'وصل تقريباً 🏁'
-                  : '$etaMinutes دقيقة';
+              // 🌟 التعديل السحري: حساب المسافة بناءً على موقع الطالب وليس التكنو
+              double distanceInKm = 0;
+              if (_myLocation != null) {
+                distanceInKm =
+                    Geolocator.distanceBetween(
+                      lat,
+                      lng,
+                      _myLocation!.latitude,
+                      _myLocation!.longitude,
+                    ) /
+                    1000;
+              } else {
+                distanceInKm =
+                    Geolocator.distanceBetween(
+                      lat,
+                      lng,
+                      _technoUniversityLocation.latitude,
+                      _technoUniversityLocation.longitude,
+                    ) /
+                    1000;
+              }
 
-              // 🎨 جلب الأيقونة المدمجة (الباص + الرقم)
+              int etaMinutes = ((distanceInKm / 40) * 60).round();
+
+              // 🌟 إظهار رسالة تفاعلية إذا لم يتم تحديد موقع الطالب بعد
+              String etaString = _myLocation == null
+                  ? 'جاري تحديد موقعك...'
+                  : (etaMinutes <= 1 ? 'وصل تقريباً 🏁' : '$etaMinutes دقيقة');
+
               BitmapDescriptor customIcon = await _generateNumberedBusMarker(
                 busNumber,
               );
@@ -223,10 +224,10 @@ class _StudentMapViewState extends State<StudentMapView> {
                   markerId: MarkerId('bus_$busUuid'),
                   position: newPosition,
                   infoWindow: InfoWindow(
-                    title: 'باص رقم $busNumber', // 🌟 استخدام الرقم الحقيقي
+                    title: 'باص رقم $busNumber',
                     snippet: 'الوصول المتوقع: $etaString',
                   ),
-                  icon: customIcon, // 🌟 الأيقونة الجديدة المدمجة
+                  icon: customIcon,
                   rotation: bearing,
                   anchor: const Offset(0.5, 0.5),
                   flat: true,
@@ -262,6 +263,14 @@ class _StudentMapViewState extends State<StudentMapView> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      // 🌟 حفظ موقع الطالب الفعلي لاستخدامه في الرادار
+      if (mounted) {
+        setState(() {
+          _myLocation = position;
+        });
+      }
+
       mapController?.animateCamera(
         CameraUpdate.newLatLng(LatLng(position.latitude, position.longitude)),
       );

@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'supervisor_statistics_view.dart';
 import 'supervisor_bus_table.dart';
 import 'complaints_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'supervisor_map_view.dart';
 import 'package:just_bus_tracker/screens/supervisor/accounts_management_view.dart';
 
@@ -23,8 +24,8 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
 
   // 🌟 مصفوفة الواجهات بالترتيب الهندي الجديد والمطلوب 100%
   final List<Widget> _pages = [
-    const SupervisorStatisticsView(), // Index 0: الإحصائيات
-    const SupervisorBusTable(), // Index 1: الباصات
+    const SupervisorStatisticsView(), // Index 0: الإحصائيات (الآن تتضمن مراقبة السعة الحية)
+    const SupervisorBusTable(), // Index 1: إدارة البيانات والرحلات
     const SupervisorMapView(), // Index 2: الخريطة
     const ComplaintsView(), // Index 3: الشكاوى
     const AccountsManagementView(), // Index 4: الحسابات (تتضمن حسابي بالداخل)
@@ -37,28 +38,56 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
     _listenToCancellations();
   }
 
-  // 📡 دالة الرادار: الاستماع الفوري لجدول الإشعارات في الخلفية
-  void _listenToCancellations() {
+  // 📡 دالة الرادار: الاستماع الفوري مع ذاكرة الهاتف المحلية
+  Future<void> _listenToCancellations() async {
+    // 🌟 تهيئة الذاكرة المحلية
+    final prefs = await SharedPreferences.getInstance();
+
     Supabase.instance.client
         .from('notifications')
-        .stream(primaryKey: ['notification_id'])
+        .stream(
+          primaryKey: ['id'],
+        ) // إذا كان المفتاح الأساسي للجدول هو notification_id استبدلها هنا
         .order('date_time', ascending: false)
-        .listen((List<Map<String, dynamic>> data) {
+        .listen((List<Map<String, dynamic>> data) async {
           if (data.isNotEmpty) {
             final latestNotification = data.first;
-            final String currentNotificationId =
-                latestNotification['notification_id']?.toString() ??
+
+            // جلب المعرف بأي اسم كان (لتجنب أخطاء تسمية الأعمدة)
+            final String notifId =
                 latestNotification['id']?.toString() ??
+                latestNotification['notification_id']?.toString() ??
                 '';
 
-            if (latestNotification['type'] == 'cancellation' &&
-                currentNotificationId != _lastNotificationId) {
-              _lastNotificationId = currentNotificationId;
+            if (notifId.isEmpty) return;
 
-              _playAlertSound(); // 🔊 تشغيل الصوت
+            // 🌟 فحص الذاكرة المحلية: هل قمنا بعرض هذا الإشعار من قبل؟
+            bool isAlreadyShown = prefs.getBool('notif_$notifId') ?? false;
+
+            if (latestNotification['type'] == 'cancellation' &&
+                !isAlreadyShown) {
+              // 🌟 حفظ الإشعار كـ "مقروء" في ذاكرة الهاتف فوراً لمنع تكراره للأبد!
+              await prefs.setBool('notif_$notifId', true);
+
+              _playAlertSound();
               _showSupervisorAlert(
-                latestNotification['message'] ?? '',
-              ); // ⚠️ إظهار النافذة
+                latestNotification['message'] ?? 'تم إلغاء حجز',
+              );
+
+              // محاولة تحديث قاعدة البيانات (كإجراء إضافي في الخلفية)
+              try {
+                await Supabase.instance.client
+                    .from('notifications')
+                    .update({'is_read': true})
+                    .eq(
+                      'id',
+                      notifId,
+                    ); // إذا كان اسم العمود مختلفاً، سيتم تجاهل الخطأ لأننا حمينا التطبيق محلياً
+              } catch (e) {
+                debugPrint(
+                  'فشل التحديث في الداتا بيز ولكن تم الحفظ محلياً: $e',
+                );
+              }
             }
           }
         });
@@ -207,7 +236,7 @@ class _SupervisorDashboardState extends State<SupervisorDashboard> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.directions_bus),
-            label: 'الباصات',
+            label: 'البيانات', // 🌟 تم تعديل الاسم ليعكس الوظيفة الشاملة
           ),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'الخريطة'),
           BottomNavigationBarItem(

@@ -46,59 +46,64 @@ class DatabaseService {
   // ==========================================
   // 3. دالة حجز مقعد (الطالب)
   // ==========================================
-  Future<String> bookSeat(String busId) async {
+  Future<String> bookSeat(
+    String tripId,
+    String busId, {
+    String boardingType = 'المجمع',
+    String? stationName,
+    double? lat,
+    double? lng,
+  }) async {
     try {
-      // 1. التحقق من تسجيل الدخول
-      final userId = _supabase.auth.currentUser?.id;
+      final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return 'error_not_logged_in';
 
-      // 2. 🛑 التحقق من وجود حجز "نشط" فقط (تجاهل الحجوزات الملغية تماماً)
-      final existingReservations = await _supabase
+      // التأكد أن الطالب ليس لديه حجز نشط آخر
+      final existingRes = await Supabase.instance.client
           .from('reservations')
           .select()
           .eq('user_id', userId)
-          .eq(
-            'status',
-            'نشط',
-          ) // 🌟 التعديل الجوهري هنا لمنع التعليق والخطأ الأحمر
-          .limit(1);
+          .eq('status', 'نشط');
+      if (existingRes.isNotEmpty) return 'already_booked';
 
-      if (existingReservations.isNotEmpty) {
-        return 'already_booked'; // يُمنع فقط إذا كان يملك حجزاً نشطاً حالياً
-      }
-
-      // 3. جلب بيانات الباص للتحقق من السعة الحالية
-      final busData = await _supabase
+      // جلب السعة الكلية من الباص، والركاب الحاليين من الرحلة!
+      final busData = await Supabase.instance.client
           .from('buses')
-          .select('capacity, current_passengers')
+          .select('capacity')
           .eq('id', busId)
           .single();
+      int capacity = int.tryParse(busData['capacity']?.toString() ?? '0') ?? 0;
 
-      final int capacity = busData['capacity'] ?? 0;
-      final int currentPassengers = busData['current_passengers'] ?? 0;
+      final tripData = await Supabase.instance.client
+          .from('trips')
+          .select('current_passengers')
+          .eq('id', tripId)
+          .single();
+      int currentPassengers =
+          int.tryParse(tripData['current_passengers']?.toString() ?? '0') ?? 0;
 
-      // 4. منع الحجز إذا كان الباص ممتلئاً
-      if (currentPassengers >= capacity) {
-        return 'full';
-      }
+      if (currentPassengers >= capacity) return 'full';
 
-      // 5. إضافة الحجز في جدول الحجوزات مع تعيين الحالة الافتراضية "نشط"
-      await _supabase.from('reservations').insert({
+      // تسجيل الحجز مع معرف الرحلة
+      await Supabase.instance.client.from('reservations').insert({
         'user_id': userId,
         'bus_id': busId,
-        'status':
-            'نشط', // 🌟 إرسال الحالة صراحة متوافقة مع شاشة رحلتي وقاعدة البيانات
+        'trip_id': tripId, // 🌟 المعرف الجديد
+        'status': 'نشط',
+        'boarding_type': boardingType,
+        'station_name': stationName,
+        'latitude': lat,
+        'longitude': lng,
       });
 
-      // 6. تحديث عدد الركاب الحاليين في جدول الباصات
-      await _supabase
-          .from('buses')
+      // 🌟 زيادة العداد في جدول الرحلات (وليس الباصات)
+      await Supabase.instance.client
+          .from('trips')
           .update({'current_passengers': currentPassengers + 1})
-          .eq('id', busId);
-
+          .eq('id', tripId);
       return 'success';
     } catch (e) {
-      print('🔥 خطأ أثناء عملية الحجز: $e');
+      print('Booking error: $e');
       return 'error';
     }
   }

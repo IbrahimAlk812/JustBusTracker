@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:just_bus_tracker/screens/student/bus_map_view.dart'; // 🌟 تفعيل مسار شاشة الخريطة
+import 'package:just_bus_tracker/screens/student/bus_map_view.dart';
+import 'package:just_bus_tracker/screens/auth/login_screen.dart'; // 🌟 أضفنا هذا المسار لطرد الطالب المحظور
 
 class MyReservationsView extends StatefulWidget {
   const MyReservationsView({super.key});
@@ -13,11 +14,15 @@ class _MyReservationsViewState extends State<MyReservationsView> {
   bool _isLoading = true;
   bool _isRequestingStop = false;
   bool _isCanceling = false;
+  bool _isConfirmingBoarding = false;
 
   Map<String, dynamic>? _reservationData;
   Map<String, dynamic>? _busData;
+  Map<String, dynamic>? _tripData;
+  String _driverName = 'غير معروف';
+
   String _studentName = 'طالب';
-  String _universityId = 'N/A'; // 🌟 متغير جديد لحفظ الرقم الجامعي
+  String _universityId = 'N/A';
 
   @override
   void initState() {
@@ -25,24 +30,37 @@ class _MyReservationsViewState extends State<MyReservationsView> {
     _fetchMyActiveReservation();
   }
 
-  // 1. جلب بيانات الحجز النشط للطالب
+  // 🌟 دالة جلب تاريخ اليوم باللغة العربية
+  String _getTodayArabicDate() {
+    final now = DateTime.now();
+    const days = [
+      'الإثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
+    ];
+    final dayName = days[now.weekday - 1];
+    return '$dayName ${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _fetchMyActiveReservation() async {
     setState(() => _isLoading = true);
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      // جلب اسم الطالب ورقم الجامعة من جدول الـ profiles
       final profileRes = await Supabase.instance.client
           .from('profiles')
-          .select('name, university_id') // 🌟 جلب الحقلين معاً
+          .select('name, university_id')
           .eq('id', user.id)
           .single();
 
       _studentName = profileRes['name'] ?? 'طالب';
       _universityId = profileRes['university_id']?.toString() ?? 'N/A';
 
-      // جلب الحجز الفعال (نشط)
       final res = await Supabase.instance.client
           .from('reservations')
           .select()
@@ -52,13 +70,31 @@ class _MyReservationsViewState extends State<MyReservationsView> {
 
       if (res != null) {
         _reservationData = res;
-        // جلب بيانات الباص المرتبط بهذا الحجز
+        final busId = res['bus_id'].toString();
+        final tripId = res['trip_id'].toString();
+
         final bus = await Supabase.instance.client
             .from('buses')
             .select()
-            .eq('id', res['bus_id'])
+            .eq('id', busId)
             .single();
         _busData = bus;
+
+        if (bus['driver_id'] != null) {
+          final driver = await Supabase.instance.client
+              .from('profiles')
+              .select('name')
+              .eq('id', bus['driver_id'])
+              .maybeSingle();
+          if (driver != null) _driverName = driver['name'].toString();
+        }
+
+        final trip = await Supabase.instance.client
+            .from('trips')
+            .select()
+            .eq('id', tripId)
+            .maybeSingle();
+        _tripData = trip;
       }
     } catch (e) {
       debugPrint('Error fetching reservation: $e');
@@ -67,7 +103,42 @@ class _MyReservationsViewState extends State<MyReservationsView> {
     }
   }
 
-  // 2. دالة طلب النزول
+  Future<void> _confirmBoarding() async {
+    if (_reservationData == null) return;
+    setState(() => _isConfirmingBoarding = true);
+
+    try {
+      await Supabase.instance.client
+          .from('reservations')
+          .update({'has_boarded': true})
+          .eq('id', _reservationData!['id']);
+
+      setState(() {
+        _reservationData!['has_boarded'] = true;
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تم تأكيد صعودك للباص بنجاح! رحلة موفقة 🚌',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ أثناء التأكيد.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isConfirmingBoarding = false);
+    }
+  }
+
   Future<void> _sendStopRequest() async {
     if (_busData == null) return;
     setState(() => _isRequestingStop = true);
@@ -101,11 +172,9 @@ class _MyReservationsViewState extends State<MyReservationsView> {
     }
   }
 
-  // 3. دالة إلغاء الحجز
   Future<void> _cancelReservation() async {
-    if (_reservationData == null || _busData == null) return;
+    if (_reservationData == null || _tripData == null) return;
 
-    // 🌟 تحديث نص نافذة التأكيد ليطابق واجهة الباصات تماماً
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => Directionality(
@@ -117,7 +186,7 @@ class _MyReservationsViewState extends State<MyReservationsView> {
           title: const Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(
                 'تأكيد إلغاء الحجز',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -126,7 +195,7 @@ class _MyReservationsViewState extends State<MyReservationsView> {
           ),
           content: const Text(
             'هل أنت متأكد أنك تريد إلغاء حجزك؟\n\n'
-            'ملاحظة: الإلغاء المتكرر أو الإلغاء المتأخر قد يعرض حسابك للحظر المؤقت من الحجز للحفاظ على حقوق الطلبة الآخرين.',
+            'ملاحظة: الإلغاء المتكرر يعرض حسابك للحظر المؤقت من النظام.',
             style: TextStyle(fontSize: 15, height: 1.5),
           ),
           actions: [
@@ -151,27 +220,63 @@ class _MyReservationsViewState extends State<MyReservationsView> {
 
     setState(() => _isCanceling = true);
     try {
-      // تغيير حالة الحجز بقاعدة البيانات إلى ملغي
       await Supabase.instance.client
           .from('reservations')
           .update({'status': 'ملغي'})
           .eq('id', _reservationData!['id']);
 
-      // إنقاص عدد الركاب في الباص
       final currentPassengers =
-          int.tryParse(_busData!['current_passengers'].toString()) ?? 1;
+          int.tryParse(_tripData!['current_passengers'].toString()) ?? 1;
       final newPassengersCount = currentPassengers > 0
           ? currentPassengers - 1
           : 0;
 
       await Supabase.instance.client
-          .from('buses')
+          .from('trips')
           .update({'current_passengers': newPassengersCount})
-          .eq('id', _busData!['id']);
+          .eq('id', _tripData!['id']);
+
+      // 🌟 نظام العقوبات: تسجيل المخالفة والطرد التلقائي للمخالفين
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final profileRes = await Supabase.instance.client
+            .from('profiles')
+            .select('cancellation_warnings')
+            .eq('id', user.id)
+            .single();
+
+        int warnings = profileRes['cancellation_warnings'] ?? 0;
+        warnings += 1;
+        bool shouldBan = warnings >= 3;
+
+        await Supabase.instance.client
+            .from('profiles')
+            .update({'cancellation_warnings': warnings, 'is_banned': shouldBan})
+            .eq('id', user.id);
+
+        if (shouldBan && mounted) {
+          // تسجيل الخروج فوراً وطرده لصفحة البداية
+          await Supabase.instance.client.auth.signOut();
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم حظر حسابك لتجاوز الحد المسموح من الإلغاءات!'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+      }
 
       setState(() {
         _reservationData = null;
         _busData = null;
+        _tripData = null;
       });
 
       if (!mounted) return;
@@ -182,7 +287,6 @@ class _MyReservationsViewState extends State<MyReservationsView> {
         ),
       );
     } catch (e) {
-      debugPrint('Error canceling: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('حدث خطأ أثناء الإلغاء.'),
@@ -241,7 +345,7 @@ class _MyReservationsViewState extends State<MyReservationsView> {
           ),
           const SizedBox(height: 10),
           const Text(
-            'قم بحجز مقعدك من قائمة الباصات المتاحة',
+            'قم بحجز مقعدك من قائمة الرحلات المتاحة',
             style: TextStyle(color: Colors.grey),
           ),
         ],
@@ -251,7 +355,19 @@ class _MyReservationsViewState extends State<MyReservationsView> {
 
   Widget _buildActiveReservationView() {
     final String busNumber = _busData!['bus_number']?.toString() ?? 'N/A';
-    final String route = _busData!['route']?.toString() ?? 'مسار غير محدد';
+    final String route =
+        _tripData?['route_name']?.toString() ?? 'مسار غير محدد';
+    final String depTime =
+        _tripData?['departure_time']?.toString() ?? 'غير محدد';
+    final String boardingType =
+        _reservationData!['boarding_type']?.toString() ?? 'المجمع';
+    final String stationName =
+        _reservationData!['station_name']?.toString() ?? '';
+    final String boardingDisplay = boardingType == 'المجمع'
+        ? 'المجمع'
+        : 'محطة: $stationName';
+
+    final bool hasBoarded = _reservationData!['has_boarded'] ?? false;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -318,24 +434,53 @@ class _MyReservationsViewState extends State<MyReservationsView> {
                               'الرقم الجامعي',
                               _universityId,
                               isRight: false,
-                            ), // 🌟 تم استبداله بالرقم الجامعي هنا
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(),
+                        ),
+                        // 🌟 إضافة اليوم والتاريخ ومكان الركوب
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildTicketInfo(
+                              'اليوم والتاريخ',
+                              _getTodayArabicDate(),
+                            ),
+                            _buildTicketInfo(
+                              'نقطة الركوب',
+                              boardingDisplay,
+                              isRight: false,
+                            ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(),
+                        ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _buildTicketInfo('المسار', route),
                             _buildTicketInfo(
-                              'الحالة',
-                              'مؤكد 🟢',
+                              'وقت الانطلاق',
+                              depTime,
                               isRight: false,
                             ),
                           ],
                         ),
-                        const SizedBox(
-                          height: 10,
-                        ), // 🌟 تم التخلص من خطوط الباركود المتقطعة والـ QR بالكامل لتبقى التذكرة نظيفة ومبسطة
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            _buildTicketInfo('اسم السائق', _driverName),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -343,12 +488,72 @@ class _MyReservationsViewState extends State<MyReservationsView> {
               ),
             ),
             const SizedBox(height: 30),
+
+            if (!hasBoarded)
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton.icon(
+                  onPressed: _isConfirmingBoarding ? null : _confirmBoarding,
+                  icon: _isConfirmingBoarding
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.how_to_reg, color: Colors.white),
+                  label: const Text(
+                    'تأكيد الصعود للباص ✔️',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 3,
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.verified, color: Colors.green.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'تم تأكيد الركوب بنجاح',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 15),
+
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // 🌟 تفعيل التوجيه لشاشة الخريطة الحية مباشرة عند الضغط
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -374,11 +579,14 @@ class _MyReservationsViewState extends State<MyReservationsView> {
               ),
             ),
             const SizedBox(height: 15),
+
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _isRequestingStop ? null : _sendStopRequest,
+                onPressed: (!hasBoarded || _isRequestingStop)
+                    ? null
+                    : _sendStopRequest,
                 icon: _isRequestingStop
                     ? const SizedBox(
                         width: 20,
@@ -396,7 +604,7 @@ class _MyReservationsViewState extends State<MyReservationsView> {
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
-                ), // 🌟 تعديل النص المطلوبة
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade600,
                   shape: RoundedRectangleBorder(
@@ -407,22 +615,24 @@ class _MyReservationsViewState extends State<MyReservationsView> {
               ),
             ),
             const SizedBox(height: 15),
-            if (_isCanceling)
-              const Center(child: CircularProgressIndicator())
-            else
-              TextButton.icon(
-                onPressed: _cancelReservation,
-                icon: const Icon(Icons.cancel, color: Colors.grey),
-                label: const Text(
-                  'إلغاء الحجز',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
+
+            if (!hasBoarded)
+              if (_isCanceling)
+                const Center(child: CircularProgressIndicator())
+              else
+                TextButton.icon(
+                  onPressed: _cancelReservation,
+                  icon: const Icon(Icons.cancel, color: Colors.grey),
+                  label: const Text(
+                    'إلغاء الحجز',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
                   ),
                 ),
-              ),
           ],
         ),
       ),
@@ -435,7 +645,14 @@ class _MyReservationsViewState extends State<MyReservationsView> {
           ? CrossAxisAlignment.start
           : CrossAxisAlignment.end,
       children: [
-        Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 4),
         Text(
           value,
