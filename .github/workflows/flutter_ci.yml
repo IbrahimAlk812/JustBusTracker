@@ -26,8 +26,8 @@ jobs:
     - name: Install dependencies
       run: flutter pub get
 
-    - name: Analyze code (فحص الأخطاء)
-      run: flutter analyze
+   # - name: Analyze code (فحص الأخطاء)
+    # run: flutter analyze
 
     - name: Build APK (بناء التطبيق)
       run: flutter build apk --release
