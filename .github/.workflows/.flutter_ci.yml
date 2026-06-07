@@ -1,0 +1,51 @@
+name: Flutter CI/CD Build
+
+# This tells GitHub to run the pipeline whenever you push code to 'develop' or 'main'
+on:
+  push:
+    branches: [ "develop", "main" ]
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Grab the code from your repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Java (Required for building Android apps)
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Set up the Flutter environment
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      # 4. Securely create the .env file using GitHub Secrets
+      - name: Create .env file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
+
+      # 5. Get Flutter packages
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 6. Build the actual Android application (APK file)
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 7. Upload the APK so the team (and the professor) can download it from GitHub
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JustBusTracker-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
