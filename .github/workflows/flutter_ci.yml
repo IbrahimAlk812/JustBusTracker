@@ -1,11 +1,8 @@
-
-YAML
 name: Flutter CI/CD
-
-# متى يعمل هذا الروبوت؟ عند كل عملية رفع (Push) على فرع main
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
