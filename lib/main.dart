@@ -139,7 +139,6 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // الصفحة الافتراضية للتجربة
       home: const LoginScreen(),
     );
   }
