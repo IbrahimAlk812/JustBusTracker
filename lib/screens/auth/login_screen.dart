@@ -33,15 +33,32 @@ class _LoginScreenState extends State<LoginScreen> {
       try {
         final profileData = await Supabase.instance.client
             .from('profiles')
-            .select('role, is_approved')
+            .select('role, is_approved, is_banned') // 🌟 تم إضافة is_banned
             .eq('id', user.id)
             .single();
 
         final String userRole = profileData['role'];
         final bool isApproved = profileData['is_approved'] ?? false;
+        final bool isBanned =
+            profileData['is_banned'] ?? false; // 🌟 استخراج حالة الحظر
 
         if (!mounted) return;
 
+        // 🌟 الجدار الأمني الأول: التحقق من الحظر
+        if (isBanned) {
+          await Supabase.instance.client.auth.signOut();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('عذراً، هذا الحساب محظور بسبب تجاوز حد المخالفات.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+
+        // الجدار الأمني الثاني: التحقق من التفعيل
         if (!isApproved) {
           await Supabase.instance.client.auth.signOut();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // الدالة المسؤولة عن تسجيل الدخول والتوجيه (تم الحفاظ عليها كاملة 100%)
+  // الدالة المسؤولة عن تسجيل الدخول والتوجيه
   Future<void> _loginAndRoute() async {
     setState(() {
       _isLoading = true;
@@ -97,19 +114,36 @@ class _LoginScreenState extends State<LoginScreen> {
       final User? user = res.user;
 
       if (user != null) {
-        // 2. جلب نوع المستخدم (role) وحالة التفعيل من جدول profiles
+        // 2. جلب نوع المستخدم (role) وحالة التفعيل وحالة الحظر من جدول profiles
         final profileData = await Supabase.instance.client
             .from('profiles')
-            .select('role, is_approved')
+            .select('role, is_approved, is_banned') // 🌟 تم إضافة is_banned
             .eq('id', user.id)
             .single();
 
         final String userRole = profileData['role'];
         final bool isApproved = profileData['is_approved'] ?? false;
+        final bool isBanned =
+            profileData['is_banned'] ?? false; // 🌟 استخراج حالة الحظر
 
         if (!mounted) return;
 
-        // 🌟 الجدار الأمني: إذا كان الحساب غير مفعل، نمنع الدخول
+        // 🌟 الجدار الأمني الأول: التحقق من الحظر
+        if (isBanned) {
+          await Supabase.instance.client.auth.signOut(); // تسجيل خروج فوري
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'عذراً، هذا الحساب محظور بسبب تجاوز حد الإلغاءات أو الغياب.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          return; // إيقاف الدالة ومنع الدخول
+        }
+
+        // 🌟 الجدار الأمني الثاني: التحقق من التفعيل
         if (!isApproved) {
           await Supabase.instance.client.auth.signOut(); // تسجيل خروج فوري
           ScaffoldMessenger.of(context).showSnackBar(
@@ -191,9 +225,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: primaryBlue.withValues(
-                    alpha: 0.1,
-                  ), // خلفية زرقاء شفافة
+                  color: primaryBlue.withOpacity(
+                    0.1,
+                  ), // استخدمت withOpacity لضمان التوافقية
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
