@@ -20,9 +20,9 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image (non-functional)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./nonexistent/Dockerfile   # <-- intentionally invalid path
-          push: false
-          tags: ibrahimalk812/justbustracker:nonfunctional
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/justbustracker:latest
