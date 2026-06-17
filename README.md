@@ -67,3 +67,4 @@ CREATE TABLE reservations (
     has_boarded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
