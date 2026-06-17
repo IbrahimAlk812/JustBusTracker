@@ -1,0 +1,20 @@
+name: 1. Functional Workflow - Check
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Get Dependencies
+      run: flutter pub get
