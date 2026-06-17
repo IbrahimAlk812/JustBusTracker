@@ -2,7 +2,7 @@ name: Non-Functional CI - Docker Deploy
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   build-and-deploy:
