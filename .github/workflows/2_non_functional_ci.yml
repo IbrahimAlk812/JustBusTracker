@@ -1,46 +1,28 @@
-name: 2. Non-Functional Workflow - Docker Deploy
+name: Non-Functional CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-    # 1. سحب الكود من المستودع
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # 2. إعداد بيئة فلاتر
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        channel: 'stable'
+      - name: Log in to DockerHub (non-functional)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # 3. حقن المتغيرات السرية (بدونها سيفشل البناء)
-    - name: Create .env file
-      run: |
-        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
-        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-        echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> .env
-
-    # 4. بناء نسخة الويب
-    - name: Build Flutter Web
-      run: flutter build web --release
-
-    # 5. تسجيل الدخول في دوكر
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    # 6. بناء الحاوية ورفعها (مع تحديد مسار Dockerfile بدقة)
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/just-bus-tracker:latest
+      - name: Build Docker image (non-functional)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./nonexistent/Dockerfile   # <-- intentionally invalid path
+          push: false
+          tags: ibrahimalk812/justbustracker:nonfunctional
