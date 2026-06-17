@@ -2,7 +2,7 @@ name: 1. Functional Workflow - Check
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
 
 jobs:
   check-dependencies:
